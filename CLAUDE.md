@@ -42,8 +42,12 @@ pnpm build:vercel   # frontend + bundel fungsi → .vercel/output (perintah buil
 pnpm db:generate    # buat migrasi SQL dari server/db/schema.ts
 pnpm db:migrate     # terapkan migrasi ke DATABASE_URL (.env.local)
 pnpm env:siapkan    # buat secret login & enkripsi untuk Vercel
+pnpm db:cek         # baca saja: tabel, jumlah migrasi, jumlah baris — tanpa mencetak alamat DB
 pnpm format         # oxfmt, gaya: tanpa titik koma, kutip tunggal, lebar 140
 ```
+
+`.env.local` berisi alamat database PRODUKSI. Claude tidak bisa membacanya (aturan izin),
+dan memang tidak perlu: skrip `migrate`/`db-cek` memuatnya sendiri tanpa mencetaknya.
 
 Sebelum menyerahkan pekerjaan: `typecheck`, `test`, dan `build:vercel` exit 0. Jangan
 menyambung gate dengan pipe (`pnpm typecheck | tail && …`) — pipe menelan exit code.
