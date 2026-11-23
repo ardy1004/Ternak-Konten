@@ -1,5 +1,5 @@
 import { monogram } from '../lib/format'
-import { curve, medianCurve, PLATFORM_CODE, PLATFORMS, POSTER_COLORS, stockDays } from '../lib/mock'
+import { curve, medianCurve, PLATFORM_CODE, PLATFORMS, POSTER_COLORS, stockDays } from '../lib/store'
 import type { AccountState, Channel, PlatformPost, Ratio, Stage } from '../lib/types'
 import { Icon, type IconName } from './Icon'
 
@@ -141,6 +141,7 @@ export function StockBar({ c }: { c: Channel }) {
 
 export const ACCOUNT_LABEL: Record<AccountState, { label: string; color: string; icon: IconName | null }> = {
   ok: { label: 'Sehat', color: 'var(--green)', icon: 'check' },
+  linked: { label: 'Tersambung', color: 'var(--ink2)', icon: 'link' },
   fail: { label: 'Gagal tayang', color: 'var(--red)', icon: 'alert' },
   login: { label: 'Login kedaluwarsa', color: 'var(--red)', icon: 'alert' },
   stale: { label: 'Basi', color: 'var(--amber)', icon: 'clock' },

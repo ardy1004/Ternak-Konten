@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useApp } from '../app/context'
 import { Poster } from '../components/domain'
+import { LiveNotice } from '../components/LiveNotice'
 import { Icon } from '../components/Icon'
 import { Label } from '../components/ui'
 import { duration } from '../lib/format'
-import { CHANNELS, liveChannels, schedulerReady, videosFor } from '../lib/mock'
+import { CHANNELS, liveChannels, schedulerReady, videosFor } from '../lib/store'
 import type { Ratio } from '../lib/types'
 
 interface UploadRow {
@@ -47,7 +48,7 @@ function sampleRows(): UploadRow[] {
 }
 
 export default function Massal() {
-  const { toast } = useApp()
+  const { toast, demoOnly, mode } = useApp()
   const navigate = useNavigate()
   const [rows, setRows] = useState<UploadRow[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -65,6 +66,7 @@ export default function Massal() {
   return (
     <div className="p-5 md:p-8">
       <h1 className="disp mb-6 text-[40px] md:text-[56px]">Unggah Massal</h1>
+      <LiveNotice>Unggah ke Cloudinary tersambung di tahap 2b.</LiveNotice>
       <label className="mb-10 block w-full cursor-pointer rounded-[6px] border-2 border-dashed border-ink bg-surface/50 py-10 text-center hover:bg-sand/40">
         <input
           type="file"
@@ -74,6 +76,8 @@ export default function Massal() {
           onClick={(e) => {
             // Selama unggah sungguhan belum tersambung, klik memuat file contoh.
             e.preventDefault()
+            // Mode sungguhan: belum ada unggah ke Cloudinary — jangan memuat baris contoh.
+            if (mode === 'live') return demoOnly('', 'Unggah massal')
             setRows(sampleRows())
           }}
         />
@@ -109,7 +113,7 @@ export default function Massal() {
                 type="button"
                 className="btn btn-outline"
                 disabled={selected.length === 0}
-                onClick={() => toast(`Template diterapkan ke ${selected.length} video`)}
+                onClick={() => demoOnly(`Template diterapkan ke ${selected.length} video`, 'Template caption')}
               >
                 Terapkan template caption
               </button>
@@ -216,7 +220,7 @@ export default function Massal() {
                 className="btn btn-tomato w-full justify-center"
                 disabled={uploading}
                 onClick={() => {
-                  toast(`${rows.length} video masuk antrean ${perChannel.length} channel`)
+                  demoOnly(`${rows.length} video masuk antrean ${perChannel.length} channel`, 'Unggah massal')
                   setRows([])
                   navigate('/')
                 }}

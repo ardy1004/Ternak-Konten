@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { PlatGlyph, Poster, StageGlyph } from '../components/domain'
+import { LiveNotice } from '../components/LiveNotice'
 import { Icon } from '../components/Icon'
 import { Seg } from '../components/ui'
 import { clock, monogram } from '../lib/format'
-import { dayCapacity, liveChannels, NOW, PLATFORM_CODE, PLATFORMS, providerAt, WEEK_DAYS, weekPosts, type CalendarPost } from '../lib/mock'
+import { dayCapacity, liveChannels, NOW, PLATFORM_CODE, PLATFORMS, providerAt, WEEK_DAYS, weekPosts, type CalendarPost } from '../lib/store'
 
 /** 8 warna lembut ramah-kertas, satu per channel. Teks di atasnya selalu tinta gelap. */
 const TINTS = ['#EBD9C6', '#D5E0D3', '#EFE3B8', '#D3DCE8', '#E6D2D0', '#DCE5C8', '#EBCFD2', '#D9D3E4']
@@ -59,6 +60,7 @@ export default function Kalender() {
         </div>
       </div>
 
+      <LiveNotice>Jadwal posting muncul setelah unggah video (tahap 2b) dan penjadwal (tahap 2c) tersambung.</LiveNotice>
       {open && (
         <div className="box fixed right-6 top-24 z-40 w-72 p-3" role="dialog" aria-label={`Post ${open.channel.name}`}>
           <button type="button" className="absolute right-2 top-2" onClick={() => setOpen(null)} aria-label="Tutup">

@@ -1,9 +1,12 @@
+import type { Requirement } from '../../shared/contract'
+
 export type Stage = 'Bibit' | 'Tumbuh' | 'Panen' | 'Dipangkas'
 export type Provider = 'Buffer' | 'Zernio'
 export type Ratio = '9:16' | '16:9' | '1:1'
 
 /** Kesehatan satu akun platform milik channel. */
-export type AccountState = 'ok' | 'fail' | 'login' | 'stale' | 'off'
+/** linked = tersambung, tapi kesehatannya belum diketahui (belum ada data metrik). */
+export type AccountState = 'ok' | 'linked' | 'fail' | 'login' | 'stale' | 'off'
 
 /** Status satu video di satu platform. */
 export type PostState = 'antre' | 'terjadwal' | 'tayang' | 'gagal' | 'belum-pasti' | 'off'
@@ -39,9 +42,19 @@ export interface Channel {
    */
   routes: (Route | null)[]
   lastPost: string[]
-  /** Koneksi Cloudinary tempat video channel ini disimpan. */
+  /** Koneksi Cloudinary efektif tempat video channel ini disimpan (sudah memperhitungkan storage global). */
   storageId: string
   auto: boolean
+  // Field di bawah hanya ada di mode sungguhan; dipakai form edit channel.
+  /** Pilihan storage tersimpan; null = ikut storage global. */
+  storageConnectionId?: string | null
+  email?: string
+  captionTemplate?: string
+  hashtags?: string[]
+  targetMetric?: string
+  scheduleMode?: 'auto' | 'manual'
+  manualSlots?: string[]
+  startedAt?: string | null
 }
 
 // ─── Koneksi (bank kredensial) ────────────────────────────────────────────────
@@ -55,6 +68,8 @@ export interface LinkedProfile {
   platform: number
   /** Nama akun di platformnya. Dipakai untuk mendeteksi akun yang dipakai dua channel. */
   handle: string
+  /** Tidak lagi muncul di provider saat tes terakhir, tapi masih dirujuk channel. */
+  missing?: boolean
 }
 
 export interface Connection {
@@ -100,21 +115,9 @@ export interface AffiliateLink {
   clicks30: number
 }
 
-export type MonetizationMetric = 'followers' | 'views30' | 'views90' | 'watchHours'
-
-export interface Requirement {
-  metric: MonetizationMetric
-  label: string
-  target: number
-}
-
-/** Syarat program monetisasi. `all` wajib semua; dari `anyOf` cukup salah satu. */
-export interface MonetizationRule {
-  platform: number
-  program: string
-  all: Requirement[]
-  anyOf: Requirement[]
-}
+// Syarat monetisasi didefinisikan sekali di kontrak bersama server ↔ frontend.
+export type { MonetizationRule, Requirement } from '../../shared/contract'
+export type MonetizationMetric = Requirement['metric']
 
 export interface PlatformPost {
   state: PostState

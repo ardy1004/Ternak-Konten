@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useApp } from '../app/context'
 import { ACCOUNT_LABEL, Monogram, PlatGlyph, Spark, StageGlyph, StockBar, TickBar } from '../components/domain'
+import { LiveNotice } from '../components/LiveNotice'
 import { Icon, type IconName } from '../components/Icon'
 import { Label, useSort } from '../components/ui'
 import { clock, num, rupiahShort, times } from '../lib/format'
@@ -18,7 +19,7 @@ import {
   targetRatio,
   weekPosts,
   type ActionKind,
-} from '../lib/mock'
+} from '../lib/store'
 import type { Channel } from '../lib/types'
 
 /** ROI tampil sebagai "4,1×"; null (channel tanpa biaya) jadi tanda pisah. */
@@ -37,6 +38,11 @@ const matches = (c: Channel, f: Filter) =>
 const BOARD_COLS = 'grid-cols-[40px_minmax(170px,1.4fr)_100px_80px_64px_minmax(110px,1fr)_72px]'
 
 export default function Ringkasan() {
+  if (CHANNELS.length === 0) return <Welcome />
+  return <Board />
+}
+
+function Board() {
   const [filter, setFilter] = useState<Filter>(null)
   const s = summary()
   const { sorted, sortBy, key } = useSort(
@@ -72,11 +78,14 @@ export default function Ringkasan() {
           {s.channels} channel · {s.accounts} akun · {num(s.views30)} views 30 hari · pendapatan {rupiahShort(s.revenue)} · biaya{' '}
           {rupiahShort(s.cost)}/bln ·{' '}
           <Link to="/pendapatan" className="underline">
-            ROI {times(s.roi ?? 0)}
+            ROI {s.roi === null ? '—' : times(s.roi)}
           </Link>
         </p>
       </div>
 
+      <LiveNotice>
+        Views, follower, dan pendapatan mulai terisi setelah penarik metrik tersambung (tahap 3). Sementara semua angka 0.
+      </LiveNotice>
       <Decisions />
 
       <div className="grid grid-cols-12 gap-8">
@@ -207,7 +216,7 @@ function ChannelCell({ c }: { c: Channel }) {
 }
 
 function Decisions() {
-  const { openModal, toast } = useApp()
+  const { openModal, demoOnly } = useApp()
   const rows = CHANNELS.map((c) => ({ c, rec: recommendation(c) })).filter((r) => r.rec)
   if (rows.length === 0) return null
   return (
@@ -250,10 +259,14 @@ function Decisions() {
                 <b>{c.name}</b> di atas target ({times(targetRatio(c))}) di hari ke-{c.day}. Naikkan ke Panen?
               </span>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-primary" onClick={() => toast(`${c.name} naik ke Panen`)}>
+                <button type="button" className="btn btn-primary" onClick={() => demoOnly(`${c.name} naik ke Panen`, 'Perubahan tahap')}>
                   Naikkan ke Panen
                 </button>
-                <button type="button" className="btn btn-outline" onClick={() => toast(`${c.name} tetap di ${c.stage}`)}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => demoOnly(`${c.name} tetap di ${c.stage}`, 'Perubahan tahap')}
+                >
                   Tunggu dulu
                 </button>
               </div>
@@ -386,5 +399,54 @@ function HealthGrid() {
         </table>
       </div>
     </section>
+  )
+}
+
+/** Belum ada channel sama sekali: arahkan ke tiga langkah pertama, bukan papan kosong. */
+function Welcome() {
+  const { openWizard } = useApp()
+  const steps: { n: string; title: string; text: string; action: ReactNode }[] = [
+    {
+      n: '01',
+      title: 'Sambungkan akun',
+      text: 'Daftarkan API key Buffer/Zernio dan akun Cloudinary sekali di halaman Koneksi.',
+      action: (
+        <Link to="/koneksi" className="btn btn-primary">
+          Buka Koneksi
+        </Link>
+      ),
+    },
+    {
+      n: '02',
+      title: 'Buat channel pertama',
+      text: 'Satu channel = satu eksperimen niche: hipotesis, masa uji, target, dan akun tujuan per platform.',
+      action: (
+        <button type="button" className="btn btn-tomato" onClick={() => openWizard()}>
+          Tambah Channel
+        </button>
+      ),
+    },
+    {
+      n: '03',
+      title: 'Isi antrean',
+      text: 'Unggah video dan biarkan penjadwal mengirimnya. Tersambung di tahap berikutnya.',
+      action: null,
+    },
+  ]
+  return (
+    <div className="max-w-[1100px] p-5 md:p-8">
+      <h1 className="disp mb-3 text-[32px] md:text-[48px]">Ladang masih kosong.</h1>
+      <p className="mb-10 max-w-2xl text-ink2">Tiga langkah untuk mulai menguji niche pertama.</p>
+      <ol className="grid gap-5 md:grid-cols-3">
+        {steps.map((s) => (
+          <li key={s.n} className="box flex flex-col gap-3 p-5">
+            <span className="mono text-[12px] text-muted">{s.n}</span>
+            <h2 className="disp text-[24px]">{s.title}</h2>
+            <p className="flex-1 text-[13px] text-ink2">{s.text}</p>
+            {s.action}
+          </li>
+        ))}
+      </ol>
+    </div>
   )
 }

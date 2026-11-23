@@ -1,20 +1,21 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useApp } from '../app/context'
+import { useChannelAuto } from '../app/hooks'
 import { Monogram, PlatGlyph, Poster, StageGlyph, StageTag, TickBar } from '../components/domain'
 import { Icon } from '../components/Icon'
 import { Seg, Switch, useSort } from '../components/ui'
 import { num, rupiahShort, times } from '../lib/format'
-import { CHANNELS, problems, revenueOf, roi, stockDays, targetRatio, usesGlobalStorage } from '../lib/mock'
+import { CHANNELS, problems, revenueOf, roi, stockDays, targetRatio, usesGlobalStorage } from '../lib/store'
 import type { Channel as Ch, Stage } from '../lib/types'
 
 const STAGES: Stage[] = ['Bibit', 'Tumbuh', 'Panen', 'Dipangkas']
 const MENU = ['Edit', 'Jeda', 'Salin pengaturan', 'Ubah tahap', 'Hapus'] as const
 
 function ChannelCard({ c }: { c: Ch }) {
-  const { toast, openWizard } = useApp()
+  const { openWizard, openModal, demoOnly } = useApp()
   const [menu, setMenu] = useState(false)
-  const [auto, setAuto] = useState(c.auto)
+  const [auto, setAuto] = useChannelAuto(c)
   const gone = c.stage === 'Dipangkas'
   const days = stockDays(c)
   const r = targetRatio(c)
@@ -108,7 +109,9 @@ function ChannelCard({ c }: { c: Ch }) {
                       onClick={() => {
                         setMenu(false)
                         if (m === 'Edit') openWizard(c.id)
-                        else toast(`${m}: ${c.name}`)
+                        else if (m === 'Jeda') setAuto(false)
+                        else if (m === 'Hapus') openModal({ type: 'delete-channel', channelId: c.id })
+                        else demoOnly(`${m}: ${c.name}`, m)
                       }}
                     >
                       {m}

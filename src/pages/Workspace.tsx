@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useApp } from '../app/context'
+import { useChannelAuto } from '../app/hooks'
 import { PostMark, Poster, StageGlyph, TickBar } from '../components/domain'
+import { LiveNotice } from '../components/LiveNotice'
 import { Icon, type IconName } from '../components/Icon'
 import { Label, Seg, Switch } from '../components/ui'
 import { duration, num, times } from '../lib/format'
@@ -19,7 +21,7 @@ import {
   videoCount,
   videosFor,
   type VideoKind,
-} from '../lib/mock'
+} from '../lib/store'
 import type { Channel, Ratio, Video } from '../lib/types'
 
 const TABS: { kind: VideoKind; label: string }[] = [
@@ -71,7 +73,7 @@ function ChannelWorkspace({ c }: { c: Channel }) {
   const [menu, setMenu] = useState<{ x: number; y: number; video: Video } | null>(null)
   const [drag, setDrag] = useState<number | null>(null)
   const [over, setOver] = useState<number | null>(null)
-  const [auto, setAuto] = useState(c.auto)
+  const [auto, setAuto] = useChannelAuto(c)
   const previous = useRef<Video[] | null>(null)
 
   useEffect(() => {
@@ -243,6 +245,10 @@ function ChannelWorkspace({ c }: { c: Channel }) {
         </section>
       )}
 
+      <LiveNotice>
+        Antrean, jadwal, dan metrik video tersambung setelah unggah (tahap 2b) dan penjadwal (tahap 2c). Pengaturan channel di atas sudah
+        tersimpan sungguhan.
+      </LiveNotice>
       <div className="mb-4 flex gap-6 overflow-x-auto border-b-[1.5px] border-ink" role="tablist">
         {TABS.map((t) => (
           <button

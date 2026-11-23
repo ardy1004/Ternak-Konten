@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router'
 import { Monogram } from '../components/domain'
 import { Icon } from '../components/Icon'
-import { findChannel, LINKS, linksOf } from '../lib/mock'
+import { findChannel, LINKS, linksOf } from '../lib/store'
 
 /*
  * Halaman PUBLIK — dibuka penonton dari link di bio, tanpa login.

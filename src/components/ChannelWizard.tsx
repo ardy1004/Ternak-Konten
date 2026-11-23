@@ -1,8 +1,10 @@
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router'
+import type { ChannelDTO } from '../../shared/contract'
 import { useApp } from '../app/context'
+import { api, errorText } from '../lib/api'
 import { num } from '../lib/format'
-import { CONNECTIONS, findChannel, findConnection, GLOBAL_STORAGE_ID, ownerOfProfile, PLATFORMS } from '../lib/mock'
+import { CONNECTIONS, findChannel, findConnection, GLOBAL_STORAGE_ID, ownerOfProfile, PLATFORMS, SETTINGS } from '../lib/store'
 import { Monogram, PlatGlyph } from './domain'
 import { Icon } from './Icon'
 import { Chips, Field, Label, MultiChips, Sheet, Switch } from './ui'
@@ -22,33 +24,43 @@ interface RouteDraft {
   profileId: string
 }
 
-const schedulerConnections = CONNECTIONS.filter((k) => k.provider !== 'Cloudinary')
-const storageConnections = CONNECTIONS.filter((k) => k.provider === 'Cloudinary')
-
 /** Tambah channel (tanpa channelId) atau edit channel yang ada. Kredensial dipilih dari Koneksi, tidak diketik ulang. */
 export function ChannelWizard({ channelId, onClose }: { channelId?: string; onClose: () => void }) {
-  const { toast } = useApp()
+  const { toast, mode: appMode, reload } = useApp()
   const existing = findChannel(channelId)
   const editing = Boolean(existing)
+  // Dihitung saat render — di mode sungguhan koneksi datang dari server setelah modul dimuat.
+  const schedulerConnections = CONNECTIONS.filter((k) => k.provider !== 'Cloudinary')
+  const storageConnections = CONNECTIONS.filter((k) => k.provider === 'Cloudinary')
+  const defaults = SETTINGS.testDefaults
   const [step, setStep] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [name, setName] = useState(existing?.name ?? '')
   const [niche, setNiche] = useState<Niche>((existing?.niche as Niche) ?? 'kuliner')
-  const [tags, setTags] = useState<string[]>([`#${existing?.niche ?? 'kuliner'}`, '#fyp'])
+  const [tags, setTags] = useState<string[]>(existing?.hashtags ?? [`#${existing?.niche ?? 'kuliner'}`, '#fyp'])
+  const [email, setEmail] = useState(existing?.email ?? '')
+  const [caption, setCaption] = useState(
+    existing?.captionTemplate ?? '{judul} — simpan dulu, coba nanti. Produk di {link_bio} {hashtag_niche}',
+  )
+  const [hypothesis, setHypothesis] = useState(existing?.hypothesis ?? '')
+  const [cost, setCost] = useState(existing?.costPerMonth ?? 0)
   const [format, setFormat] = useState<Format>((existing?.format as Format) ?? 'Faceless')
-  const [days, setDays] = useState(existing?.dayTotal ?? 30)
-  const [vids, setVids] = useState(existing?.vidsTotal ?? 30)
-  const [metric, setMetric] = useState<Metric>('Median views/post')
-  const [target, setTarget] = useState(existing?.target ?? 1000)
-  const [storageId, setStorageId] = useState(existing?.storageId ?? GLOBAL_STORAGE_ID)
+  const [days, setDays] = useState(existing?.dayTotal ?? defaults.days)
+  const [vids, setVids] = useState(existing?.vidsTotal ?? defaults.videos)
+  const [metric, setMetric] = useState<Metric>(((existing?.targetMetric ?? defaults.metric) as Metric) || 'Median views/post')
+  const [target, setTarget] = useState(existing?.target ?? defaults.target)
+  // '' atau id global = ikut storage global (disimpan sebagai null).
+  const [storageId, setStorageId] = useState(existing ? (existing.storageConnectionId ?? GLOBAL_STORAGE_ID) : GLOBAL_STORAGE_ID)
   const [routes, setRoutes] = useState<RouteDraft[]>(() =>
     PLATFORMS.map((_, p) => {
       const r = existing?.routes[p]
       if (r) return { on: true, connectionId: r.connectionId, profileId: r.profileId }
-      return { on: !existing && p < 3, connectionId: schedulerConnections[0].id, profileId: '' }
+      return { on: !existing && p < 3 && schedulerConnections.length > 0, connectionId: schedulerConnections[0]?.id ?? '', profileId: '' }
     }),
   )
-  const [mode, setMode] = useState<'auto' | 'manual'>('auto')
-  const [slots, setSlots] = useState(['07.00', '12.15', '19.30'])
+  const [mode, setMode] = useState<'auto' | 'manual'>(existing?.scheduleMode ?? 'auto')
+  const [slots, setSlots] = useState(existing?.manualSlots?.length ? existing.manualSlots : ['07.00', '12.15', '19.30'])
   const [newSlot, setNewSlot] = useState('21.00')
 
   const setRoute = (p: number, patch: Partial<RouteDraft>) => setRoutes(routes.map((r, k) => (k === p ? { ...r, ...patch } : r)))
@@ -57,49 +69,103 @@ export function ChannelWizard({ channelId, onClose }: { channelId?: string; onCl
     onClose()
   }
 
+  /** Simpan ke server (mode sungguhan) atau pura-pura simpan (demo). start = mulai masa uji sekarang. */
+  const save = async (start: boolean) => {
+    setError(null)
+    if (!name.trim()) {
+      setStep(0)
+      return setError('Nama channel wajib diisi')
+    }
+    const active = routes.map((r, platform) => ({ ...r, platform })).filter((r) => r.on)
+    const incomplete = active.find((r) => !r.profileId)
+    if (incomplete) {
+      setStep(3)
+      return setError(`Pilih akun ${PLATFORMS[incomplete.platform]} atau matikan platformnya`)
+    }
+    if (appMode === 'demo')
+      return finish(editing ? `Pengaturan ${name} disimpan` : start ? `${name} dibuat, masa uji dimulai` : 'Channel disimpan, belum aktif')
+    const body = {
+      name: name.trim(),
+      niche,
+      format,
+      hypothesis,
+      email,
+      captionTemplate: caption,
+      hashtags: tags,
+      dayTotal: days,
+      vidsTotal: vids,
+      targetMetric: metric,
+      targetValue: target,
+      costPerMonth: cost,
+      perDay: mode === 'manual' ? slots.length : (existing?.perDay ?? 1),
+      scheduleMode: mode,
+      manualSlots: mode === 'manual' ? slots : [],
+      storageConnectionId: storageId && storageId !== GLOBAL_STORAGE_ID ? storageId : null,
+      routes: active.map((r) => ({ platform: r.platform, connectionId: r.connectionId, profileId: r.profileId })),
+    }
+    setSaving(true)
+    try {
+      const saved = editing
+        ? await api<ChannelDTO>(`channels/${existing!.id}`, { method: 'PATCH', body })
+        : await api<ChannelDTO>('channels', { method: 'POST', body: { ...body, start, auto: start } })
+      await reload()
+      finish(
+        editing
+          ? `Pengaturan ${saved.name} disimpan`
+          : start
+            ? `${saved.name} dibuat, masa uji dimulai`
+            : `${saved.name} disimpan, belum aktif`,
+      )
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Sheet
       title={editing ? `Pengaturan: ${existing!.name}` : 'Tambah Channel'}
       width={720}
       onClose={onClose}
       footer={
-        editing ? (
-          <>
-            <button type="button" className="btn btn-outline" onClick={onClose}>
-              Batal
-            </button>
-            <button type="button" className="btn btn-primary ml-auto" onClick={() => finish(`Pengaturan ${name} disimpan`)}>
-              Simpan perubahan
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="btn btn-outline" disabled={step === 0} onClick={() => setStep(step - 1)}>
-              Kembali
-            </button>
-            {step < STEPS.length - 1 ? (
-              <button type="button" className="btn btn-primary" onClick={() => setStep(step + 1)}>
-                Lanjut
+        <>
+          {error && (
+            <span className="w-full text-[13px] text-red" role="alert">
+              {error}
+            </span>
+          )}
+          {editing ? (
+            <>
+              <button type="button" className="btn btn-outline" onClick={onClose}>
+                Batal
               </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-tomato"
-                  onClick={() => finish(`${name || 'Channel baru'} dibuat, masa uji dimulai`)}
-                >
-                  Simpan & mulai masa uji
+              <button type="button" className="btn btn-primary ml-auto" disabled={saving} onClick={() => save(false)}>
+                {saving ? 'Menyimpan…' : 'Simpan perubahan'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn btn-outline" disabled={step === 0} onClick={() => setStep(step - 1)}>
+                Kembali
+              </button>
+              {step < STEPS.length - 1 ? (
+                <button type="button" className="btn btn-primary" onClick={() => setStep(step + 1)}>
+                  Lanjut
                 </button>
-                <button type="button" className="btn btn-outline" onClick={() => finish('Channel disimpan, belum aktif')}>
-                  Simpan, jangan aktifkan dulu
-                </button>
-              </>
-            )}
-            <button type="button" className="ml-auto text-[13px] underline" onClick={() => finish('Draft disimpan')}>
-              Simpan sebagai draft
-            </button>
-          </>
-        )
+              ) : (
+                <>
+                  <button type="button" className="btn btn-tomato" disabled={saving} onClick={() => save(true)}>
+                    {saving ? 'Menyimpan…' : 'Simpan & mulai masa uji'}
+                  </button>
+                  <button type="button" className="btn btn-outline" disabled={saving} onClick={() => save(false)}>
+                    Simpan, jangan aktifkan dulu
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </>
       }
     >
       <ol className="mb-8 flex border-b border-line">
@@ -133,14 +199,10 @@ export function ChannelWizard({ channelId, onClose }: { channelId?: string; onCl
             <Chips options={NICHES} value={niche} onChange={setNiche} />
           </Field>
           <Field label="Email akun" hint="Hanya catatan email pemilik akun. Kata sandi media sosial tidak disimpan di sini.">
-            <input type="email" placeholder="akun@gmail.com" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="akun@gmail.com" />
           </Field>
           <Field label="Template caption" hint="Variabel: {judul} {hashtag_niche} {link_bio}">
-            <textarea
-              rows={3}
-              defaultValue="{judul} — simpan dulu, coba nanti. Produk di {link_bio} {hashtag_niche}"
-              className="mono !text-[12px]"
-            />
+            <textarea rows={3} value={caption} onChange={(e) => setCaption(e.target.value)} className="mono !text-[12px]" />
           </Field>
           <Field label="Hashtag niche">
             <MultiChips options={[`#${niche}`, '#fyp', '#viral', `#${niche}harian`]} value={tags} onChange={setTags} />
@@ -151,7 +213,12 @@ export function ChannelWizard({ channelId, onClose }: { channelId?: string; onCl
       {step === 1 && (
         <>
           <Field label="Hipotesis" hint="Satu kalimat: apa yang sedang diuji.">
-            <input defaultValue={existing?.hypothesis} placeholder="Resep 30 detik tanpa bicara, close-up tangan" />
+            <input
+              value={hypothesis}
+              onChange={(e) => setHypothesis(e.target.value)}
+              placeholder="Resep 30 detik tanpa bicara, close-up tangan"
+              maxLength={300}
+            />
           </Field>
           <Field label="Format">
             <Chips options={FORMATS} value={format} onChange={setFormat} />
@@ -181,7 +248,12 @@ export function ChannelWizard({ channelId, onClose }: { channelId?: string; onCl
             Lulus bila <b>{metric.toLowerCase()}</b> ≥ <span className="mono">{num(target)}</span> di akhir masa uji.
           </p>
           <Field label="Biaya per bulan (Rp)" hint="Dipakai untuk ROI. Terisi otomatis dari harga alat di Pengaturan, boleh diubah.">
-            <input className="mono" defaultValue={num(existing?.costPerMonth ?? 150000)} />
+            <input
+              className="mono"
+              inputMode="numeric"
+              value={num(cost)}
+              onChange={(e) => setCost(Number(e.target.value.replace(/\D/g, '')) || 0)}
+            />
           </Field>
         </>
       )}
@@ -220,6 +292,14 @@ export function ChannelWizard({ channelId, onClose }: { channelId?: string; onCl
               )
             })}
           </fieldset>
+          {storageConnections.length === 0 && (
+            <p className="box p-3 text-[13px]">
+              Belum ada koneksi Cloudinary. Tambahkan dulu di halaman Koneksi — channel tetap bisa disimpan tanpa storage.
+            </p>
+          )}
+          {!GLOBAL_STORAGE_ID && storageConnections.length > 0 && (
+            <p className="mt-3 text-[12px] text-amber">Storage global belum dipilih di Pengaturan, jadi pilih salah satu akun di atas.</p>
+          )}
           <p className="mt-3 text-[12px] text-muted">Belum ada akun Cloudinary yang cocok? Tambahkan dulu di halaman Koneksi.</p>
         </>
       )}
@@ -235,6 +315,12 @@ export function ChannelWizard({ channelId, onClose }: { channelId?: string; onCl
           >
             Rute platform
           </Label>
+          {schedulerConnections.length === 0 && (
+            <p className="box mb-4 p-3 text-[13px]">
+              Belum ada koneksi Buffer atau Zernio. Tambahkan di halaman Koneksi dulu — channel tetap bisa disimpan tanpa rute, tapi belum
+              bisa posting.
+            </p>
+          )}
           <div className="scroll-x">
             <table className="w-full min-w-[600px] text-[13px]">
               <thead>

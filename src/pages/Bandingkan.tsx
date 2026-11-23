@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Poster } from '../components/domain'
+import { LiveNotice } from '../components/LiveNotice'
 import { Label, MultiChips, Seg } from '../components/ui'
 import { num, times } from '../lib/format'
 import {
@@ -15,7 +16,7 @@ import {
   PLATFORMS,
   roi,
   topVideos,
-} from '../lib/mock'
+} from '../lib/store'
 import type { Stage } from '../lib/types'
 
 const STAGES: Stage[] = ['Bibit', 'Tumbuh', 'Panen', 'Dipangkas']
@@ -62,6 +63,7 @@ export default function Bandingkan() {
     <div className="p-5 md:p-8">
       <h1 className="disp max-w-4xl text-[36px] md:text-[56px]">Bandingkan pada umur akun yang sama.</h1>
       <p className="mono mb-6 mt-3 text-[12px] text-ink2">Data terakhir {NOW.label} · ditarik dari Buffer & Zernio tiap hari</p>
+      <LiveNotice>Kurva, titik periksa, dan pola terisi setelah penarik metrik tersambung (tahap 3). Sementara semua angka 0.</LiveNotice>
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Seg options={['Views/post', 'Followers', 'Engagement'] as const} value={metric} onChange={setMetric} label="Metrik" />
         <select className="!w-44" aria-label="Platform">

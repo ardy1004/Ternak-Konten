@@ -12,7 +12,7 @@ const ITEMS: { to: string; label: string; icon: IconName; desc: string }[] = [
 
 /** Menu ponsel untuk halaman yang tidak muat di bar tab bawah, plus saklar yang di desktop ada di bar atas. */
 export default function Lainnya() {
-  const { auto, requestAuto, dark, setDark } = useApp()
+  const { auto, requestAuto, dark, setDark, signOut } = useApp()
   return (
     <div className="p-5">
       <h1 className="disp mb-6 text-[40px]">Lainnya</h1>
@@ -37,18 +37,7 @@ export default function Lainnya() {
         <Switch on={dark} onChange={setDark} label="Mode malam" />
         Mode malam
       </label>
-      <button
-        type="button"
-        className="btn btn-outline"
-        onClick={() => {
-          try {
-            sessionStorage.removeItem('tk_masuk')
-          } catch {
-            /* abaikan */
-          }
-          location.assign('/masuk')
-        }}
-      >
+      <button type="button" className="btn btn-outline" onClick={signOut}>
         Keluar
       </button>
     </div>

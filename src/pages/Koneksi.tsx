@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
+import type { ConnectionDTO } from '../../shared/contract'
 import { useApp } from '../app/context'
+import { api, errorText } from '../lib/api'
 import { ConnectionSheet } from '../components/ConnectionSheet'
 import { PlatGlyph } from '../components/domain'
 import { Icon } from '../components/Icon'
 import { Label } from '../components/ui'
-import { channelsUsing, CHANNELS, CONNECTIONS, GLOBAL_STORAGE_ID, PLATFORMS, profileAt } from '../lib/mock'
+import { channelsUsing, CHANNELS, CONNECTIONS, GLOBAL_STORAGE_ID, PLATFORMS, profileAt } from '../lib/store'
 import type { Connection, ConnectionProvider } from '../lib/types'
 
 type SheetState = { id?: string; provider?: ConnectionProvider } | null
@@ -51,6 +53,9 @@ export default function Koneksi() {
           Scheduler
         </Label>
         <div className="space-y-4">
+          {scheduler.length === 0 && (
+            <p className="text-[13px] text-muted">Belum ada koneksi Buffer atau Zernio. Tambahkan supaya channel bisa posting.</p>
+          )}
           {scheduler.map((k) => (
             <SchedulerRow key={k.id} k={k} onEdit={() => setSheet({ id: k.id })} />
           ))}
@@ -67,6 +72,9 @@ export default function Koneksi() {
         >
           Storage
         </Label>
+        {storage.length === 0 && (
+          <p className="text-[13px] text-muted">Belum ada koneksi Cloudinary. Tambahkan supaya video bisa diunggah.</p>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           {storage.map((k) => (
             <StorageRow key={k.id} k={k} onEdit={() => setSheet({ id: k.id })} />
@@ -101,27 +109,73 @@ function StatusLine({ k }: { k: Connection }) {
 }
 
 function RowActions({ k, onEdit }: { k: Connection; onEdit: () => void }) {
-  const { toast } = useApp()
+  const { toast, mode, reload } = useApp()
+  const [busy, setBusy] = useState<'test' | 'delete' | null>(null)
+  // Hapus dua langkah: klik pertama meminta konfirmasi di tombol yang sama.
+  const [confirming, setConfirming] = useState(false)
   const used = channelsUsing(k.id).length
+  const isGlobal = k.id === GLOBAL_STORAGE_ID
+  const blocked = used > 0 || isGlobal
+
+  const retest = async () => {
+    if (mode === 'demo') return toast(`Mengetes '${k.label}'…`)
+    setBusy('test')
+    try {
+      const r = await api<ConnectionDTO>(`connections/${k.id}/test`, { method: 'POST' })
+      await reload()
+      toast(r.status === 'ok' ? `'${k.label}' terhubung · ${r.profiles.length} akun tertaut` : `'${k.label}' gagal: ${r.error ?? ''}`)
+    } catch (e) {
+      toast(errorText(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const remove = async () => {
+    if (!confirming) return setConfirming(true)
+    if (mode === 'demo') {
+      setConfirming(false)
+      return toast(`Koneksi '${k.label}' dihapus`)
+    }
+    setBusy('delete')
+    try {
+      await api(`connections/${k.id}`, { method: 'DELETE' })
+      await reload()
+      toast(`Koneksi '${k.label}' dihapus`)
+    } catch (e) {
+      toast(errorText(e))
+    } finally {
+      setBusy(null)
+      setConfirming(false)
+    }
+  }
+
   return (
     <div className="flex flex-wrap gap-2">
-      <button type="button" className="btn btn-outline !py-1" onClick={() => toast(`Mengetes '${k.label}'…`)}>
+      <button type="button" className="btn btn-outline !py-1" disabled={busy !== null} onClick={retest}>
         <Icon n="refresh" s={13} />
-        Tes ulang
+        {busy === 'test' ? 'Mengetes…' : 'Tes ulang'}
       </button>
-      <button type="button" className="btn btn-outline !py-1" onClick={onEdit}>
+      <button type="button" className="btn btn-outline !py-1" disabled={busy !== null} onClick={onEdit}>
         <Icon n="edit" s={13} />
         Edit
       </button>
       <button
         type="button"
-        className="btn btn-outline !py-1 text-red"
-        disabled={used > 0}
-        title={used > 0 ? `Masih dipakai ${used} channel. Pindahkan dulu channelnya ke koneksi lain.` : undefined}
-        onClick={() => toast(`Koneksi '${k.label}' dihapus`)}
+        className={`btn !py-1 ${confirming ? 'btn-danger' : 'btn-outline text-red'}`}
+        disabled={blocked || busy !== null}
+        title={
+          used > 0
+            ? `Masih dipakai ${used} channel. Pindahkan dulu channelnya ke koneksi lain.`
+            : isGlobal
+              ? 'Ini storage global. Pilih storage global lain di Pengaturan dulu.'
+              : undefined
+        }
+        onClick={remove}
+        onBlur={() => setConfirming(false)}
       >
         <Icon n="trash" s={13} />
-        Hapus
+        {busy === 'delete' ? 'Menghapus…' : confirming ? 'Yakin hapus?' : 'Hapus'}
       </button>
     </div>
   )

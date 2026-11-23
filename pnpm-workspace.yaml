@@ -1,0 +1,5 @@
+allowBuilds:
+  esbuild: true
+# pnpm 10 (versi yang mungkin dipakai Vercel) membaca kunci ini:
+onlyBuiltDependencies:
+  - esbuild

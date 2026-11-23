@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
+import { api, errorText } from '../lib/api'
 import { useApp, type DecisionChoice, type ModalState } from '../app/context'
 import { num, times } from '../lib/format'
 import {
@@ -12,7 +14,7 @@ import {
   stockDays,
   targetRatio,
   USD_RATE_DEFAULT,
-} from '../lib/mock'
+} from '../lib/store'
 import type { Channel, RevenueSource } from '../lib/types'
 import { Monogram, StageTag } from './domain'
 import { Chips, Field, Modal, Seg } from './ui'
@@ -35,12 +37,14 @@ export function Modals({ m, close }: { m: ModalState; close: () => void }) {
       return <AutoOffModal close={close} />
     case 'revenue':
       return <RevenueModal channelId={m.channelId} close={close} />
+    case 'delete-channel':
+      return <DeleteChannelModal channel={findChannel(m.channelId)!} close={close} />
   }
 }
 
 /** Pendapatan yang tidak punya API (TikTok Creator Rewards, Facebook, dll.) dicatat manual per bulan. */
 function RevenueModal({ channelId, close }: { channelId?: string; close: () => void }) {
-  const { toast } = useApp()
+  const { toast, demoOnly } = useApp()
   const [channel, setChannel] = useState(channelId ?? CHANNELS[0].id)
   const [source, setSource] = useState<RevenueSource>('TikTok Creator Rewards')
   const [currency, setCurrency] = useState<'Rp' | 'USD'>('Rp')
@@ -62,7 +66,7 @@ function RevenueModal({ channelId, close }: { channelId?: string; close: () => v
             className="btn btn-primary"
             disabled={idr <= 0}
             onClick={() => {
-              toast(`Rp ${num(idr)} dari ${source} dicatat untuk ${findChannel(channel)?.name}`)
+              demoOnly(`Rp ${num(idr)} dari ${source} dicatat untuk ${findChannel(channel)?.name}`, 'Pencatatan pendapatan')
               close()
             }}
           >
@@ -125,7 +129,7 @@ const DECISIONS: { choice: DecisionChoice; desc: string }[] = [
 ]
 
 function DecisionModal({ channel: c, initial, close }: { channel: Channel; initial: DecisionChoice; close: () => void }) {
-  const { toast } = useApp()
+  const { toast, demoOnly } = useApp()
   const [choice, setChoice] = useState<DecisionChoice>(initial)
   const a = curve(c, 30)
   const b = medianCurve(30)
@@ -146,7 +150,7 @@ function DecisionModal({ channel: c, initial, close }: { channel: Channel; initi
             type="button"
             className={`btn ${choice === 'Pangkas' ? 'btn-danger' : 'btn-primary'}`}
             onClick={() => {
-              toast(`${c.name}: ${choice.toLowerCase()}`)
+              demoOnly(`${c.name}: ${choice.toLowerCase()}`, 'Keputusan masa uji')
               close()
             }}
           >
@@ -187,7 +191,7 @@ function DecisionModal({ channel: c, initial, close }: { channel: Channel; initi
 const CAPTION_LIMIT = [5000, 2200, 2200, 63206, 500]
 
 function ScheduleModal({ channel: c, close }: { channel: Channel; close: () => void }) {
-  const { toast } = useApp()
+  const { toast, demoOnly } = useApp()
   const usable = c.accounts.map((a) => a !== 'off')
   const [picked, setPicked] = useState(usable)
   const [when, setWhen] = useState<'Slot berikutnya (19.12 WIB)' | 'Pilih waktu'>('Slot berikutnya (19.12 WIB)')
@@ -208,7 +212,7 @@ function ScheduleModal({ channel: c, close }: { channel: Channel; close: () => v
           onClick={() => {
             setBusy(true)
             setTimeout(() => {
-              toast(`Dijadwalkan ke ${count} platform`)
+              demoOnly(`Dijadwalkan ke ${count} platform`, 'Penjadwalan')
               close()
             }, 700)
           }}
@@ -261,7 +265,7 @@ function ScheduleModal({ channel: c, close }: { channel: Channel; close: () => v
 type VerifyChoice = 'Sudah tayang' | 'Tidak ada, kirim ulang'
 
 function VerifyModal({ channel: c, close }: { channel: Channel; close: () => void }) {
-  const { toast } = useApp()
+  const { toast, demoOnly } = useApp()
   const rows = [
     { platform: 2, video: 'video #4' },
     { platform: 2, video: 'video #9' },
@@ -277,7 +281,7 @@ function VerifyModal({ channel: c, close }: { channel: Channel; close: () => voi
           className="btn btn-primary"
           disabled={choices.some((x) => x === null)}
           onClick={() => {
-            toast('Status disimpan')
+            demoOnly('Status disimpan', 'Konfirmasi status posting')
             close()
           }}
         >
@@ -313,7 +317,7 @@ function VerifyModal({ channel: c, close }: { channel: Channel; close: () => voi
 type RetryChoice = 'Kirim ulang' | 'Ternyata sudah tayang' | 'Lewati'
 
 function RetryModal({ close }: { close: () => void }) {
-  const { toast } = useApp()
+  const { toast, demoOnly } = useApp()
   const rows = ['TikTok: video terlalu pendek (min. 3 detik)', 'YouTube: channel ditangguhkan']
   const [choices, setChoices] = useState<RetryChoice[]>(rows.map(() => 'Lewati'))
   return (
@@ -326,7 +330,7 @@ function RetryModal({ close }: { close: () => void }) {
           className="btn btn-primary"
           onClick={() => {
             const n = choices.filter((x) => x === 'Kirim ulang').length
-            toast(n ? `${n} platform dikirim ulang` : 'Tidak ada yang dikirim ulang')
+            demoOnly(n ? `${n} platform dikirim ulang` : 'Tidak ada yang dikirim ulang', 'Kirim ulang')
             close()
           }}
         >
@@ -349,7 +353,7 @@ function RetryModal({ close }: { close: () => void }) {
 }
 
 function MoveModal({ fromId, count, sentCount, close }: { fromId: string; count: number; sentCount: number; close: () => void }) {
-  const { toast } = useApp()
+  const { toast, demoOnly } = useApp()
   const [target, setTarget] = useState<Channel | null>(null)
   const [place, setPlace] = useState<'Akhir antrean' | 'Depan antrean'>('Akhir antrean')
   const movable = count - sentCount
@@ -364,7 +368,7 @@ function MoveModal({ fromId, count, sentCount, close }: { fromId: string; count:
           className="btn btn-primary"
           disabled={!target || movable === 0}
           onClick={() => {
-            toast(`${movable} video dipindah ke ${target!.name}`)
+            demoOnly(`${movable} video dipindah ke ${target!.name}`, 'Pindah video')
             close()
           }}
         >
@@ -397,7 +401,7 @@ function MoveModal({ fromId, count, sentCount, close }: { fromId: string; count:
 }
 
 function DeleteModal({ count, close }: { count: number; close: () => void }) {
-  const { toast } = useApp()
+  const { toast, demoOnly } = useApp()
   return (
     <Modal
       title={`Hapus permanen ${count} video?`}
@@ -411,7 +415,7 @@ function DeleteModal({ count, close }: { count: number; close: () => void }) {
             type="button"
             className="btn btn-danger"
             onClick={() => {
-              toast(`${count} video dihapus permanen`)
+              demoOnly(`${count} video dihapus permanen`, 'Hapus video')
               close()
             }}
           >
@@ -451,6 +455,58 @@ function AutoOffModal({ close }: { close: () => void }) {
     >
       <p>
         Semua channel berhenti memposting sampai auto-posting dinyalakan lagi. Video yang sudah terjadwal di Buffer/Zernio tetap tayang.
+      </p>
+    </Modal>
+  )
+}
+
+function DeleteChannelModal({ channel: c, close }: { channel: Channel; close: () => void }) {
+  const { toast, mode, reload } = useApp()
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const confirm = async () => {
+    if (mode === 'demo') {
+      toast(`Channel ${c.name} dihapus`)
+      return close()
+    }
+    setBusy(true)
+    try {
+      await api(`channels/${c.id}`, { method: 'DELETE' })
+      await reload()
+      toast(`Channel ${c.name} dihapus`)
+      close()
+      navigate('/channel')
+    } catch (e) {
+      setError(errorText(e))
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      title={`Hapus channel ${c.name}?`}
+      onClose={close}
+      footer={
+        <>
+          {error && (
+            <span className="w-full text-[13px] text-red" role="alert">
+              {error}
+            </span>
+          )}
+          <button type="button" className="btn btn-outline" onClick={close}>
+            Batal
+          </button>
+          <button type="button" className="btn btn-danger" disabled={busy} onClick={confirm}>
+            {busy ? 'Menghapus…' : 'Hapus channel'}
+          </button>
+        </>
+      }
+    >
+      <p>
+        Pengaturan dan rute platform channel ini ikut terhapus. Koneksi Buffer/Zernio/Cloudinary dan akun media sosialnya tidak tersentuh.
+      </p>
+      <p className="mt-2 text-[13px] text-muted">
+        Kalau eksperimennya hanya ingin dihentikan, pilih &ldquo;Pangkas&rdquo; — datanya tetap tersimpan.
       </p>
     </Modal>
   )

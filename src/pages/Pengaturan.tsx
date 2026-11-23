@@ -1,14 +1,24 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
+import type { SettingsDTO } from '../../shared/contract'
 import { useApp } from '../app/context'
-import { Field, Label, Seg, Switch } from '../components/ui'
+import { Field, Label, Switch } from '../components/ui'
+import { api, errorText } from '../lib/api'
 import { num } from '../lib/format'
-import { CHANNELS, CONNECTIONS, GLOBAL_STORAGE_ID, MONETIZATION_RULES, PLATFORMS, providerAt, USD_RATE_DEFAULT } from '../lib/mock'
+import {
+  CHANNELS,
+  CONNECTIONS,
+  GLOBAL_STORAGE_ID,
+  MONETIZATION_RULES,
+  PLATFORMS,
+  providerAt,
+  SETTINGS,
+  USD_RATE_DEFAULT,
+} from '../lib/store'
 import { TARGET_METRICS } from '../components/ChannelWizard'
 
 const TABS = [
   'Umum',
-  'Mode akun',
   'Masa uji default',
   'Biaya & kurs',
   'Syarat monetisasi',
@@ -32,14 +42,37 @@ const LOG = [
 ]
 
 export default function Pengaturan() {
-  const { auto, requestAuto, dark, setDark, toast } = useApp()
+  const { auto, requestAuto, dark, setDark, toast, demoOnly, mode, reload } = useApp()
   const [tab, setTab] = useState<Tab>('Umum')
-  const [mode, setMode] = useState<'Terpusat' | 'Per channel'>('Per channel')
   const [notify, setNotify] = useState<Record<string, boolean>>({})
-  const [prices, setPrices] = useState({ buffer: 60000, zernio: 45000, cloudinary: 350000 })
+  const [workspaceName, setWorkspaceName] = useState(SETTINGS.workspaceName)
+  const [testDefaults, setTestDefaults] = useState(SETTINGS.testDefaults)
+  const [prices, setPrices] = useState(SETTINGS.prices)
+  const [saving, setSaving] = useState(false)
   const [rate, setRate] = useState(USD_RATE_DEFAULT)
   const [rules, setRules] = useState(MONETIZATION_RULES)
   const [globalStorage, setGlobalStorage] = useState(GLOBAL_STORAGE_ID)
+  const savable: Partial<Record<Tab, () => Partial<SettingsDTO>>> = {
+    Umum: () => ({ workspaceName }),
+    'Masa uji default': () => ({ testDefaults }),
+    'Biaya & kurs': () => ({ prices, usdRate: rate }),
+    'Syarat monetisasi': () => ({ monetizationRules: rules }),
+    'Storage global': () => ({ globalStorageId: globalStorage || null }),
+  }
+  const save = async () => {
+    const pick = savable[tab]
+    if (mode === 'demo' || !pick) return demoOnly('Pengaturan disimpan', `Pengaturan ${tab.toLowerCase()}`)
+    setSaving(true)
+    try {
+      await api('settings', { method: 'PUT', body: pick() })
+      await reload()
+      toast('Pengaturan disimpan')
+    } catch (e) {
+      toast(errorText(e))
+    } finally {
+      setSaving(false)
+    }
+  }
   // Biaya per akun media sosial yang aktif, dikelompokkan per provider koneksinya.
   const connected = CHANNELS.flatMap((c) => c.accounts.map((a, i) => (a !== 'off' ? providerAt(c, i) : null)))
   const total =
@@ -70,7 +103,7 @@ export default function Pengaturan() {
           {tab === 'Umum' && (
             <>
               <Field label="Nama workspace">
-                <input defaultValue="Ternak Konten" />
+                <input value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} maxLength={80} />
               </Field>
               <Field label="Zona waktu">
                 <select>
@@ -89,42 +122,41 @@ export default function Pengaturan() {
             </>
           )}
 
-          {tab === 'Mode akun' && (
-            <>
-              <div className="mb-4">
-                <Seg options={['Terpusat', 'Per channel'] as const} value={mode} onChange={setMode} label="Mode akun" />
-              </div>
-              {mode === 'Terpusat' ? (
-                <Field label="Channel utama" hint="Semua channel memakai scheduler & storage milik channel ini.">
-                  <select>
-                    {CHANNELS.filter((c) => c.stage !== 'Dipangkas').map((c) => (
-                      <option key={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </Field>
-              ) : (
-                <p className="text-ink2">Setiap channel memakai scheduler dan storage sendiri.</p>
-              )}
-            </>
-          )}
-
           {tab === 'Masa uji default' && (
             <div className="grid grid-cols-2 gap-4">
               <Field label="Hari">
-                <input className="mono" type="number" defaultValue={30} />
+                <input
+                  className="mono"
+                  type="number"
+                  min={1}
+                  value={testDefaults.days}
+                  onChange={(e) => setTestDefaults({ ...testDefaults, days: +e.target.value })}
+                />
               </Field>
               <Field label="Video">
-                <input className="mono" type="number" defaultValue={30} />
+                <input
+                  className="mono"
+                  type="number"
+                  min={1}
+                  value={testDefaults.videos}
+                  onChange={(e) => setTestDefaults({ ...testDefaults, videos: +e.target.value })}
+                />
               </Field>
               <Field label="Metrik">
-                <select>
+                <select value={testDefaults.metric} onChange={(e) => setTestDefaults({ ...testDefaults, metric: e.target.value })}>
                   {TARGET_METRICS.map((m) => (
                     <option key={m}>{m}</option>
                   ))}
                 </select>
               </Field>
               <Field label="Nilai target">
-                <input className="mono" type="number" defaultValue={1000} />
+                <input
+                  className="mono"
+                  type="number"
+                  min={0}
+                  value={testDefaults.target}
+                  onChange={(e) => setTestDefaults({ ...testDefaults, target: +e.target.value })}
+                />
               </Field>
             </div>
           )}
@@ -211,6 +243,7 @@ export default function Pengaturan() {
               <p className="mb-4 text-ink2">Channel yang tidak memilih akun Cloudinary sendiri menyimpan videonya di sini.</p>
               <Field label="Koneksi Cloudinary global">
                 <select value={globalStorage} onChange={(e) => setGlobalStorage(e.target.value)}>
+                  <option value="">Belum dipilih</option>
                   {CONNECTIONS.filter((k) => k.provider === 'Cloudinary').map((k) => (
                     <option key={k.id} value={k.id}>
                       {k.label} ({k.cloudName})
@@ -308,8 +341,8 @@ export default function Pengaturan() {
             ))}
 
           {tab !== 'Log aktivitas' && (
-            <button type="button" className="btn btn-primary mt-6" onClick={() => toast('Pengaturan disimpan')}>
-              Simpan
+            <button type="button" className="btn btn-primary mt-6" disabled={saving} onClick={save}>
+              {saving ? 'Menyimpan…' : 'Simpan'}
             </button>
           )}
         </div>

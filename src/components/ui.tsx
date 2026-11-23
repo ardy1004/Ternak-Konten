@@ -1,6 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icon } from './Icon'
 
+/** Catatan kuning di atas halaman/seksi. Dipakai untuk bagian yang datanya belum tersambung di mode sungguhan. */
+export function Notice({ children }: { children: ReactNode }) {
+  return <p className="mb-6 max-w-3xl rounded-[4px] border-[1.5px] border-amber p-3 text-[13px] text-amber">{children}</p>
+}
+
 /** Label seksi editorial: huruf mono kecil + garis rambut sepanjang baris. */
 export function Label({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../app/context'
-import { findChannel } from '../lib/mock'
+import { findChannel } from '../lib/store'
 import { Poster } from './domain'
 import { Icon } from './Icon'
 import { Field, Sheet, Switch } from './ui'
@@ -13,7 +13,7 @@ const SAMPLE_FILES = [
 ]
 
 export function UploadSheet({ channelId, onClose }: { channelId: string; onClose: () => void }) {
-  const { toast } = useApp()
+  const { demoOnly, mode } = useApp()
   const c = findChannel(channelId)
   const [same, setSame] = useState(true)
   const [front, setFront] = useState(false)
@@ -32,7 +32,7 @@ export function UploadSheet({ channelId, onClose }: { channelId: string; onClose
             type="button"
             className="btn btn-tomato ml-auto"
             onClick={() => {
-              toast(`${SAMPLE_FILES.length} video masuk antrean${front ? ' (paling depan)' : ''}`)
+              demoOnly(`${SAMPLE_FILES.length} video masuk antrean${front ? ' (paling depan)' : ''}`, 'Unggah video')
               onClose()
             }}
           >
@@ -41,6 +41,11 @@ export function UploadSheet({ channelId, onClose }: { channelId: string; onClose
         </>
       }
     >
+      {mode === 'live' && (
+        <p className="mb-4 rounded-[4px] border-[1.5px] border-amber p-3 text-[13px] text-amber">
+          Unggah ke Cloudinary menyusul di tahap berikutnya. Daftar di bawah masih contoh.
+        </p>
+      )}
       <label className="mb-5 block cursor-pointer rounded-[6px] border-2 border-dashed border-ink p-8 text-center">
         <input type="file" accept="video/mp4,video/quicktime" multiple className="sr-only" />
         <Icon n="upload" s={24} className="mx-auto mb-2" />

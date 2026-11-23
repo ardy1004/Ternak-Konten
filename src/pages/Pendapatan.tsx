@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { useApp } from '../app/context'
 import { StageGlyph, TickBar } from '../components/domain'
+import { LiveNotice } from '../components/LiveNotice'
 import { Icon } from '../components/Icon'
 import { Field, Label, Seg, Sheet } from '../components/ui'
 import { num, rupiahShort, times } from '../lib/format'
@@ -16,12 +17,12 @@ import {
   liveChannels,
   monetizationProgress,
   moneySummary,
-  MONTH_LABEL,
+  monthLabel,
   PLATFORMS,
   PREVIOUS_MONTH,
   revenueOf,
   roi,
-} from '../lib/mock'
+} from '../lib/store'
 
 export default function Pendapatan() {
   const { openModal } = useApp()
@@ -43,8 +44,8 @@ export default function Pendapatan() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <div className="max-w-3xl">
           <h1 className="disp text-[32px] md:text-[48px]">
-            {MONTH_LABEL[CURRENT_MONTH]}: {rupiahShort(m.revenue)} masuk, ROI{' '}
-            <span className={(m.roi ?? 0) >= 1 ? 'text-tomatotxt' : ''}>{times(m.roi ?? 0)}</span>.
+            {monthLabel(CURRENT_MONTH)}: {rupiahShort(m.revenue)} masuk, ROI{' '}
+            <span className={(m.roi ?? 0) >= 1 ? 'text-tomatotxt' : ''}>{m.roi === null ? '—' : times(m.roi)}</span>.
           </h1>
           <p className="mono mt-4 text-[12px] text-ink2">
             afiliasi Rp {num(m.affiliate)} · monetisasi platform Rp {num(m.platform)} · biaya Rp {num(m.cost)} · bulan lalu Rp{' '}
@@ -63,6 +64,10 @@ export default function Pendapatan() {
         </div>
       </div>
 
+      <LiveNotice>
+        Pencatatan pendapatan, link afiliasi, link-in-bio, dan impor komisi tersambung di tahap metrik & uang (tahap 3). ROI di bawah masih
+        0.
+      </LiveNotice>
       <section className="mb-12">
         <Label>Per channel</Label>
         <div className="scroll-x">
@@ -252,7 +257,7 @@ function MonetizationOverview() {
 }
 
 function ImportSheet({ onClose }: { onClose: () => void }) {
-  const { toast } = useApp()
+  const { demoOnly } = useApp()
   const [program, setProgram] = useState<'Shopee Affiliate' | 'TikTok Shop'>('Shopee Affiliate')
   const [loaded, setLoaded] = useState(false)
   const [assign, setAssign] = useState<Record<number, string>>({})
@@ -272,7 +277,7 @@ function ImportSheet({ onClose }: { onClose: () => void }) {
             className="btn btn-primary ml-auto"
             disabled={!loaded || unknown > 0}
             onClick={() => {
-              toast(`${rows.length} baris komisi diimpor (Rp ${num(total)})`)
+              demoOnly(`${rows.length} baris komisi diimpor (Rp ${num(total)})`, 'Impor komisi')
               onClose()
             }}
           >
@@ -354,7 +359,7 @@ function ImportSheet({ onClose }: { onClose: () => void }) {
 }
 
 function LinkSheet({ onClose }: { onClose: () => void }) {
-  const { toast } = useApp()
+  const { demoOnly } = useApp()
   const live = liveChannels()
   const [channelId, setChannelId] = useState(live[0].id)
   const [title, setTitle] = useState('')
@@ -380,7 +385,7 @@ function LinkSheet({ onClose }: { onClose: () => void }) {
           className="btn btn-primary ml-auto"
           disabled={!title.trim()}
           onClick={() => {
-            toast(`Link /r/${code} dibuat`)
+            demoOnly(`Link /r/${code} dibuat`, 'Link afiliasi')
             onClose()
           }}
         >

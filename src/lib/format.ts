@@ -4,7 +4,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0')
 export const num = (n: number) => Math.round(n).toLocaleString('id-ID')
 
 /** 180000 → "Rp 180rb", 1240000 → "Rp 1.240.000" */
-export const rupiahShort = (n: number) => (n >= 1e6 ? `Rp ${num(n)}` : `Rp ${Math.round(n / 1000)}rb`)
+export const rupiahShort = (n: number) => (n === 0 ? 'Rp 0' : n >= 1e6 ? `Rp ${num(n)}` : `Rp ${Math.round(n / 1000)}rb`)
 
 /** 1.24 → "1,2×" */
 export const times = (x: number) => `${x.toFixed(1).replace('.', ',')}×`

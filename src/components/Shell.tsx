@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useMatch, useNavigate } from 'react-router'
 import { useApp, type ToastAction } from '../app/context'
-import { actionCount, CHANNELS, findChannel, liveChannels, problems } from '../lib/mock'
+import { actionCount, CHANNELS, findChannel, liveChannels, problems } from '../lib/store'
 import { StageGlyph } from './domain'
 import { Icon, type IconName } from './Icon'
 import { Switch } from './ui'
@@ -128,7 +128,7 @@ function pageTitle(path: string) {
 }
 
 function TopBar() {
-  const { auto, requestAuto, openUpload } = useApp()
+  const { auto, requestAuto, openUpload, mode, demoReason } = useApp()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const onChannel = useMatch('/channel/:id')
@@ -140,6 +140,14 @@ function TopBar() {
       <span className="hidden whitespace-nowrap text-[13px] text-muted sm:block">
         Ternak Konten / <span className="text-ink">{pageTitle(pathname)}</span>
       </span>
+      {mode === 'demo' && (
+        <span
+          className="mono shrink-0 rounded-[3px] border-[1.5px] border-amber px-1.5 text-[10px] font-semibold uppercase text-amber"
+          title={`Data contoh — ${demoReason}. Lihat SETUP.md untuk menyambungkan database.`}
+        >
+          Demo
+        </span>
+      )}
       <div className="relative ml-auto max-w-sm flex-1 sm:ml-4">
         <Icon n="search" s={14} className="absolute left-2.5 top-3 text-muted" />
         <input className="!pl-8" placeholder="Cari video, caption, channel…" aria-label="Cari" />
