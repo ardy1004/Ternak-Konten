@@ -53,7 +53,9 @@ export async function detectMode(): Promise<ModeCheck> {
           ? 'migrasi database belum dijalankan'
           : h.db === 'unreachable'
             ? 'database tidak bisa dihubungi'
-            : 'secret login belum diatur'
+            : Array.isArray(h.authProblems) && h.authProblems.length
+              ? `secret login belum benar: ${h.authProblems.join('; ')}`
+              : 'secret login belum diatur'
     return { mode: 'demo', reason }
   } catch {
     return { mode: 'demo', reason: 'server API tidak aktif' }

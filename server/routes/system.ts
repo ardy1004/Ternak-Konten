@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { HealthDTO } from '../../shared/contract.js'
 import { verifyPassword } from '../crypto.js'
 import { getDb, hasDbConfig } from '../db/client.js'
-import { authConfigured, env } from '../env.js'
+import { authConfigured, authProblems, env } from '../env.js'
 import { HttpError, ok, readJson } from '../http.js'
 import { route } from '../router.js'
 import { clearCookie, createSession, requireOperator, sessionCookie } from '../session.js'
@@ -19,14 +19,18 @@ route(
   'GET',
   '/health',
   async () => {
-    const auth = authConfigured()
-    if (!hasDbConfig()) return ok<HealthDTO>({ db: 'missing-env', auth })
+    // Nama variabel yang bermasalah ikut dikirim supaya operator tahu persis apa yang
+    // harus diperbaiki — nilai secret TIDAK PERNAH ikut. Setelah benar, daftar ini hilang.
+    const problems = authProblems()
+    const auth = problems.length === 0
+    const extra = auth ? {} : { authProblems: problems }
+    if (!hasDbConfig()) return ok<HealthDTO>({ db: 'missing-env', auth, ...extra })
     try {
       const row = firstRow(await getDb().execute(sql`select to_regclass('public.connections')::text as t`))
-      return ok<HealthDTO>({ db: row?.t ? 'ok' : 'not-migrated', auth })
+      return ok<HealthDTO>({ db: row?.t ? 'ok' : 'not-migrated', auth, ...extra })
     } catch (err) {
       console.error('[api] health db', err)
-      return ok<HealthDTO>({ db: 'unreachable', auth })
+      return ok<HealthDTO>({ db: 'unreachable', auth, ...extra })
     }
   },
   { public: true },

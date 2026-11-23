@@ -32,6 +32,8 @@ export interface HealthDTO {
   /** ok = siap dipakai; selain itu aplikasi berjalan dalam mode demo. */
   db: 'ok' | 'missing-env' | 'unreachable' | 'not-migrated'
   auth: boolean
+  /** Saat auth=false: variabel login mana yang bermasalah (nama & aturan saja, tanpa nilai). */
+  authProblems?: string[]
 }
 
 export interface ProfileDTO {

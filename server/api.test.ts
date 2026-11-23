@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/pglite'
 import { migrate } from 'drizzle-orm/pglite/migrator'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { ChannelDTO, ConnectionDTO, ConnectionTestDTO, SettingsDTO } from '../shared/contract.js'
+import type { ChannelDTO, ConnectionDTO, ConnectionTestDTO, HealthDTO, SettingsDTO } from '../shared/contract.js'
 import { handle } from './app.js'
 import { decryptJson, hashPassword } from './crypto.js'
 import { setDb, type Db } from './db/client.js'
@@ -89,6 +89,31 @@ describe('kesehatan & login', () => {
   it('health melaporkan database siap dan login terkonfigurasi', async () => {
     const r = await call<{ db: string; auth: boolean }>('health', { auth: false })
     expect(r.json.data).toEqual({ db: 'ok', auth: true })
+  })
+
+  it('membersihkan kesalahan tempel dari dashboard: awalan NAMA=, tanda kutip, spasi', async () => {
+    const original = process.env.OPERATOR_PASSWORD_HASH!
+    process.env.OPERATOR_PASSWORD_HASH = ` OPERATOR_PASSWORD_HASH="${original}"\n`
+    try {
+      expect((await call<HealthDTO>('health', { auth: false })).json.data.auth).toBe(true)
+      const login = await call('auth/login', { method: 'POST', auth: false, body: { email: EMAIL, password: PASSWORD } })
+      expect(login.status).toBe(200)
+    } finally {
+      process.env.OPERATOR_PASSWORD_HASH = original
+    }
+  })
+
+  it('health menyebut NAMA variabel yang salah, tidak pernah nilainya', async () => {
+    const original = process.env.SESSION_SECRET!
+    process.env.SESSION_SECRET = 'pendek-RAHASIA'
+    try {
+      const r = await call<HealthDTO>('health', { auth: false })
+      expect(r.json.data.auth).toBe(false)
+      expect(r.json.data.authProblems).toEqual(['SESSION_SECRET kosong atau kurang dari 32 karakter'])
+      expect(r.raw).not.toContain('RAHASIA')
+    } finally {
+      process.env.SESSION_SECRET = original
+    }
   })
 
   it('menolak kata sandi salah dengan pesan umum', async () => {
