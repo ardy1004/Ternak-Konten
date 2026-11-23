@@ -10,7 +10,15 @@ daftar layar: `docs/PRODUK.md`.
 - **Fondasi frontend selesai (2026-11-23).** Semua layar jalan dengan DATA CONTOH
   dari `src/lib/mock.ts`. Belum ada backend, belum ada login sungguhan
   (sesi sementara di `sessionStorage`).
-- Berikutnya: backend di Vercel — lihat "Rencana backend" di bawah.
+- **Tahap 1 UI selesai (2026-11-23):** Koneksi (bank kredensial), Edit Channel,
+  Pendapatan (afiliasi + monetisasi + ROI), link-in-bio publik, "Jalan ke monetisasi",
+  syarat monetisasi & kurs di Pengaturan.
+- Berikutnya: tahap 2 backend di Vercel — lihat "Rencana backend" di bawah.
+
+Urutan tahap: (1) UI ✓ → (2) backend inti → (3) metrik & uang (potret H+1/H+7/H+30,
+follower harian, pelacak klik /r, impor CSV komisi) → (4) label konten per video →
+(5) server MCP khusus baca untuk analisa oleh Claude → (6) YouTube revenue API,
+riset tren, alert Telegram.
 
 ## Stack
 
@@ -41,13 +49,19 @@ src/
   lib/format.ts            format angka/jam Indonesia — selalu pakai ini
   lib/mock.ts              DATA CONTOH + aturan bisnis sebagai fungsi murni
   components/              Icon, ui (primitif), domain (glyph tahap, poster, …),
-                           Shell, modals, ChannelWizard, UploadSheet
+                           Shell, modals, ChannelWizard (tambah & edit),
+                           ConnectionSheet, UploadSheet
   pages/                   satu file per route
   styles/index.css         token warna & komponen dasar
 ```
 
-Route: `/` Ringkasan · `/channel` · `/channel/:id` ruang kerja · `/unggah` ·
-`/kalender` · `/bandingkan` · `/pengaturan` · `/masuk`.
+Route operator (wajib masuk): `/` Ringkasan · `/channel` · `/channel/:id` ruang kerja ·
+`/unggah` · `/kalender` · `/bandingkan` · `/pendapatan` · `/koneksi` · `/pengaturan` ·
+`/lainnya` (menu ponsel) · `/masuk`.
+
+Route **publik** (tanpa masuk, tanpa sidebar): `/l/:channelId` halaman link-in-bio ·
+`/r/:code` pengalih link afiliasi (di backend: catat klik lalu 302). Halaman publik
+tidak boleh menampilkan apa pun yang internal — hipotesis, tahap, angka, nama aplikasi.
 
 **Saat backend datang, cukup `src/lib/mock.ts` yang diganti** dengan pemanggilan
 API. Halaman tidak boleh membuat data sendiri. Aturan bisnis di sana (stok,
@@ -72,6 +86,23 @@ rekomendasi, vonis, masa uji) dipindah ke server, bukan dihapus.
   Apa pun yang menempel ke tepi kiri konten (mis. bar aksi massal) membacanya.
 
 ## Aturan bisnis
+
+- **Ukuran menang = uang.** Monetisasi lewat afiliasi (Shopee Affiliate, TikTok Shop)
+  dan monetisasi platform (YouTube, TikTok Creator Rewards, Facebook).
+  ROI = pendapatan bulan berjalan ÷ biaya per bulan.
+- **Kredensial hidup di Koneksi, bukan di channel.** Channel menyimpan rujukan
+  `routes[platform] = { connectionId, profileId }` dan `storageId`. Satu koneksi
+  Buffer/Zernio/Cloudinary bisa dipakai banyak channel; koneksi yang masih dipakai
+  tidak boleh dihapus.
+- **Akun ganda dideteksi dari handle akun platform**, bukan ID provider — akun yang
+  sama bisa tertaut di Buffer DAN Zernio dengan ID berbeda.
+- **Syarat monetisasi tidak boleh ditanam di logika** — berubah dari waktu ke waktu dan
+  berbeda per negara. Bawaan di `MONETIZATION_RULES`, diubah operator di Pengaturan.
+- Kode link pendek (`/r/:code`) = Sub ID di program afiliasi, supaya laporan komisi
+  CSV cocok otomatis ke channel.
+- Pendapatan selalu disimpan dalam Rupiah; USD dikonversi saat dicatat dengan kurs
+  yang diatur operator.
+- Kata sandi akun media sosial tidak pernah disimpan — akun disambungkan di Buffer/Zernio.
 
 - Masa uji selesai bila **hari DAN jumlah video** tercapai — channel yang jarang
   diisi tidak boleh "gagal" hanya karena kurang konten.

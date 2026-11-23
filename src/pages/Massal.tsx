@@ -5,7 +5,7 @@ import { Poster } from '../components/domain'
 import { Icon } from '../components/Icon'
 import { Label } from '../components/ui'
 import { duration } from '../lib/format'
-import { CHANNELS, liveChannels, videosFor } from '../lib/mock'
+import { CHANNELS, liveChannels, schedulerReady, videosFor } from '../lib/mock'
 import type { Ratio } from '../lib/types'
 
 interface UploadRow {
@@ -31,7 +31,7 @@ function warnings(r: UploadRow): string[] {
 }
 
 function sampleRows(): UploadRow[] {
-  const targets = liveChannels().filter((c) => c.schedulerReady)
+  const targets = liveChannels().filter(schedulerReady)
   const base = videosFor(CHANNELS[0], 'antre').slice(0, 12)
   return base.map((v, i) => ({
     id: v.id,

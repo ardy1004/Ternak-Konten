@@ -6,18 +6,28 @@ import { Icon, type IconName } from '../components/Icon'
 import { Label, useSort } from '../components/ui'
 import { clock, num, rupiahShort, times } from '../lib/format'
 import {
+  actionItems,
   CHANNELS,
-  findChannel,
   liveChannels,
   NOW,
   PLATFORMS,
+  providerAt,
   recommendation,
+  roi,
   summary,
   targetRatio,
-  UNCERTAIN,
   weekPosts,
+  type ActionKind,
 } from '../lib/mock'
 import type { Channel } from '../lib/types'
+
+/** ROI tampil sebagai "4,1×"; null (channel tanpa biaya) jadi tanda pisah. */
+const RoiText = ({ r }: { r: number | null }) =>
+  r === null || r < 0 ? (
+    <span className="text-muted">—</span>
+  ) : (
+    <span className={r >= 1 ? 'font-semibold text-tomatotxt' : ''}>{times(r)}</span>
+  )
 
 type Filter = 'siap' | 'pangkas' | 'bibit' | null
 
@@ -30,7 +40,7 @@ export default function Ringkasan() {
   const [filter, setFilter] = useState<Filter>(null)
   const s = summary()
   const { sorted, sortBy, key } = useSort(
-    CHANNELS.filter((c) => matches(c, filter)),
+    CHANNELS.filter((c) => matches(c, filter)).map((c) => ({ ...c, roi: roi(c) ?? -1 })),
     'viewsPerPost',
   )
 
@@ -59,7 +69,11 @@ export default function Ringkasan() {
           <Hl f="bibit">{`${s.seedling} masih bibit`}</Hl>.
         </h1>
         <p className="mono mt-4 text-[12px] text-ink2">
-          {s.channels} channel · {s.accounts} akun · {num(s.views30)} views 30 hari · biaya {rupiahShort(s.cost)}/bln
+          {s.channels} channel · {s.accounts} akun · {num(s.views30)} views 30 hari · pendapatan {rupiahShort(s.revenue)} · biaya{' '}
+          {rupiahShort(s.cost)}/bln ·{' '}
+          <Link to="/pendapatan" className="underline">
+            ROI {times(s.roi ?? 0)}
+          </Link>
         </p>
       </div>
 
@@ -92,8 +106,8 @@ export default function Ringkasan() {
                 Foll./hari
               </Th>
               <Th k="day">Umur uji</Th>
-              <Th k="costPerMonth" right>
-                Biaya/bln
+              <Th k="roi" right>
+                ROI
               </Th>
             </div>
             {sorted.map((c, i) => (
@@ -115,7 +129,9 @@ export default function Ringkasan() {
                     Hari {c.day}/{c.dayTotal}
                   </span>
                 </span>
-                <span className="mono text-right text-[12px]">{c.costPerMonth ? rupiahShort(c.costPerMonth).replace('Rp ', '') : '—'}</span>
+                <span className="mono text-right" title={c.costPerMonth ? `Biaya ${rupiahShort(c.costPerMonth)}/bln` : 'Tanpa biaya'}>
+                  <RoiText r={c.roi} />
+                </span>
               </Link>
             ))}
           </div>
@@ -145,7 +161,9 @@ export default function Ringkasan() {
                     <span>
                       Hari {c.day}/{c.dayTotal}
                     </span>
-                    <span>{c.costPerMonth ? `${rupiahShort(c.costPerMonth)}/bln` : '—'}</span>
+                    <span>
+                      ROI <RoiText r={c.roi} />
+                    </span>
                   </div>
                 </div>
               </Link>
@@ -247,73 +265,45 @@ function Decisions() {
   )
 }
 
-interface ActionItem {
-  icon: IconName
-  tone: string
-  text: string
-  action: string
-  to?: string
-  onClick?: () => void
+/** Tampilan per jenis tindakan. Isi daftarnya datang dari actionItems() — sumber yang sama dengan angka lonceng. */
+const ACTION_VIEW: Record<ActionKind, { icon: IconName; tone: string; label: string }> = {
+  fail: { icon: 'alert', tone: 'text-red', label: 'Lihat' },
+  login: { icon: 'link', tone: 'text-red', label: 'Sambungkan' },
+  scheduler: { icon: 'plug', tone: 'text-red', label: 'Perbaiki' },
+  shared: { icon: 'alert', tone: 'text-amber', label: 'Periksa' },
+  uncertain: { icon: 'clock', tone: 'text-amber', label: 'Pastikan' },
+  storage: { icon: 'alert', tone: 'text-amber', label: 'Lihat kuota' },
 }
 
 function NeedsAction() {
-  const { openModal } = useApp()
-  const items: ActionItem[] = []
-  CHANNELS.forEach((c) => {
-    c.accounts.forEach((a, i) => {
-      if (a === 'fail')
-        items.push({
-          icon: 'alert',
-          tone: 'text-red',
-          text: `${PLATFORMS[i]} '${c.name}' gagal tayang`,
-          action: 'Lihat',
-          to: `/channel/${c.id}`,
-        })
-      if (a === 'login')
-        items.push({
-          icon: 'link',
-          tone: 'text-red',
-          text: `Login ${PLATFORMS[i]} '${c.name}' kedaluwarsa`,
-          action: 'Sambungkan',
-          to: `/channel/${c.id}`,
-        })
-    })
-    if (!c.schedulerReady && c.stage !== 'Dipangkas')
-      items.push({
-        icon: 'alert',
-        tone: 'text-red',
-        text: `Scheduler '${c.name}' kosong, posting terblokir`,
-        action: 'Atur',
-        to: `/channel/${c.id}`,
-      })
-  })
-  UNCERTAIN.forEach((u) =>
-    items.push({
-      icon: 'clock',
-      tone: 'text-amber',
-      text: `${PLATFORMS[u.platform]} '${findChannel(u.channelId)?.name}' belum pasti (${u.count})`,
-      action: 'Pastikan',
-      onClick: () => openModal({ type: 'verify', channelId: u.channelId }),
-    }),
-  )
+  const { openModal, openWizard } = useApp()
+  const items = actionItems()
   return (
     <div>
-      <Label>Perlu tindakan</Label>
-      {items.map((it) => (
-        <div key={it.text} className="flex items-start gap-2 border-b border-line py-2 text-[13px]">
-          <Icon n={it.icon} className={`mt-0.5 ${it.tone}`} />
-          <span className="flex-1">{it.text}</span>
-          {it.to ? (
-            <Link to={it.to} className="font-medium underline">
-              {it.action}
-            </Link>
-          ) : (
-            <button type="button" className="font-medium underline" onClick={it.onClick}>
-              {it.action}
-            </button>
-          )}
-        </div>
-      ))}
+      <Label>Perlu tindakan ({items.length})</Label>
+      {items.map((it) => {
+        const v = ACTION_VIEW[it.kind]
+        const cls = 'font-medium underline whitespace-nowrap'
+        return (
+          <div key={it.text} className="flex items-start gap-2 border-b border-line py-2 text-[13px]">
+            <Icon n={v.icon} className={`mt-0.5 ${v.tone}`} />
+            <span className="flex-1">{it.text}</span>
+            {it.kind === 'uncertain' ? (
+              <button type="button" className={cls} onClick={() => openModal({ type: 'verify', channelId: it.channelId! })}>
+                {v.label}
+              </button>
+            ) : it.kind === 'shared' ? (
+              <button type="button" className={cls} onClick={() => openWizard(it.channelId)}>
+                {v.label}
+              </button>
+            ) : (
+              <Link to={it.kind === 'storage' || it.kind === 'scheduler' ? '/koneksi' : `/channel/${it.channelId}`} className={cls}>
+                {v.label}
+              </Link>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -383,7 +373,7 @@ function HealthGrid() {
                             {st.label}
                           </span>
                           <span className="mono text-[11px] text-muted">
-                            {c.providers[i]} · {c.lastPost[i]}
+                            {providerAt(c, i)} · {c.lastPost[i]}
                           </span>
                         </div>
                       )}

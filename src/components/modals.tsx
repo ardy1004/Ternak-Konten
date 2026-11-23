@@ -1,10 +1,21 @@
 import { useState } from 'react'
 import { useApp, type DecisionChoice, type ModalState } from '../app/context'
 import { num, times } from '../lib/format'
-import { CHANNELS, curve, findChannel, medianCurve, PLATFORMS, stockDays, targetRatio } from '../lib/mock'
-import type { Channel } from '../lib/types'
+import {
+  CHANNELS,
+  CURRENT_MONTH,
+  curve,
+  findChannel,
+  medianCurve,
+  PLATFORMS,
+  REVENUE_SOURCES,
+  stockDays,
+  targetRatio,
+  USD_RATE_DEFAULT,
+} from '../lib/mock'
+import type { Channel, RevenueSource } from '../lib/types'
 import { Monogram, StageTag } from './domain'
-import { Chips, Modal } from './ui'
+import { Chips, Field, Modal, Seg } from './ui'
 
 export function Modals({ m, close }: { m: ModalState; close: () => void }) {
   switch (m.type) {
@@ -22,7 +33,89 @@ export function Modals({ m, close }: { m: ModalState; close: () => void }) {
       return <DeleteModal count={m.count} close={close} />
     case 'auto-off':
       return <AutoOffModal close={close} />
+    case 'revenue':
+      return <RevenueModal channelId={m.channelId} close={close} />
   }
+}
+
+/** Pendapatan yang tidak punya API (TikTok Creator Rewards, Facebook, dll.) dicatat manual per bulan. */
+function RevenueModal({ channelId, close }: { channelId?: string; close: () => void }) {
+  const { toast } = useApp()
+  const [channel, setChannel] = useState(channelId ?? CHANNELS[0].id)
+  const [source, setSource] = useState<RevenueSource>('TikTok Creator Rewards')
+  const [currency, setCurrency] = useState<'Rp' | 'USD'>('Rp')
+  const [amount, setAmount] = useState('')
+  const [rate, setRate] = useState(USD_RATE_DEFAULT)
+  const value = parseFloat(amount.replace(/\./g, '').replace(',', '.')) || 0
+  const idr = currency === 'USD' ? value * rate : value
+  return (
+    <Modal
+      title="Catat pendapatan"
+      onClose={close}
+      footer={
+        <>
+          <button type="button" className="btn btn-outline" onClick={close}>
+            Batal
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={idr <= 0}
+            onClick={() => {
+              toast(`Rp ${num(idr)} dari ${source} dicatat untuk ${findChannel(channel)?.name}`)
+              close()
+            }}
+          >
+            Simpan
+          </button>
+        </>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Channel">
+          <select value={channel} onChange={(e) => setChannel(e.target.value)}>
+            {CHANNELS.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Sumber">
+          <select value={source} onChange={(e) => setSource(e.target.value as RevenueSource)}>
+            {REVENUE_SOURCES.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Bulan">
+          <input type="month" className="mono" defaultValue={CURRENT_MONTH} />
+        </Field>
+        <Field label="Mata uang">
+          <Seg options={['Rp', 'USD'] as const} value={currency} onChange={setCurrency} label="Mata uang" />
+        </Field>
+        <Field label={`Jumlah (${currency})`}>
+          <input
+            className="mono"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder={currency === 'Rp' ? '250.000' : '12,50'}
+          />
+        </Field>
+        {currency === 'USD' && (
+          <Field label="Kurs (Rp per USD)" hint="Bawaan dari Pengaturan, boleh diubah untuk catatan ini.">
+            <input className="mono" type="number" value={rate} onChange={(e) => setRate(+e.target.value)} />
+          </Field>
+        )}
+      </div>
+      <p className="mono mt-2 text-[14px] font-semibold">= Rp {num(idr)}</p>
+      <p className="mt-3 text-[12px] text-muted">
+        Komisi afiliasi lebih baik lewat Impor komisi CSV supaya tercocokkan per link. Form ini untuk pendapatan tanpa laporan per
+        transaksi.
+      </p>
+    </Modal>
+  )
 }
 
 const DECISIONS: { choice: DecisionChoice; desc: string }[] = [

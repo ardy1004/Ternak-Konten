@@ -12,6 +12,8 @@ export const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/unggah', label: 'Unggah Massal', icon: 'upload' },
   { to: '/kalender', label: 'Kalender', icon: 'cal' },
   { to: '/bandingkan', label: 'Bandingkan Niche', icon: 'chart' },
+  { to: '/pendapatan', label: 'Pendapatan', icon: 'coin' },
+  { to: '/koneksi', label: 'Koneksi', icon: 'plug' },
   { to: '/pengaturan', label: 'Pengaturan', icon: 'gear' },
 ]
 
@@ -166,7 +168,7 @@ const MOBILE_NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/channel', label: 'Channel', icon: 'grid' },
   { to: '/unggah', label: 'Unggah', icon: 'upload' },
   { to: '/kalender', label: 'Kalender', icon: 'cal' },
-  { to: '/pengaturan', label: 'Lainnya', icon: 'dots' },
+  { to: '/lainnya', label: 'Lainnya', icon: 'dots' },
 ]
 
 function MobileTabBar() {

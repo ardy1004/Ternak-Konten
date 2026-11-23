@@ -28,6 +28,10 @@ const PATHS = {
   ext: 'M7 17L17 7M8 7h9v9',
   menu: 'M4 7h16M4 12h16M4 17h16',
   dots: 'M5 12h.01M12 12h.01M19 12h.01',
+  coin: 'M12 3a9 9 0 100 18 9 9 0 000-18zM15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5v1.5M12 16v1.5',
+  plug: 'M9 3v5M15 3v5M6 8h12v3a6 6 0 01-12 0zM12 17v4',
+  refresh: 'M20 11a8 8 0 10-2.3 5.7M20 5v6h-6',
+  bio: 'M8 3h8a2 2 0 012 2v14a2 2 0 01-2 2H8a2 2 0 01-2-2V5a2 2 0 012-2zM10 8h4M9 12h6M9 15h6',
 } as const
 
 export type IconName = keyof typeof PATHS

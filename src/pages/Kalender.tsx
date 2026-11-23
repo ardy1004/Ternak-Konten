@@ -4,7 +4,7 @@ import { PlatGlyph, Poster, StageGlyph } from '../components/domain'
 import { Icon } from '../components/Icon'
 import { Seg } from '../components/ui'
 import { clock, monogram } from '../lib/format'
-import { dayCapacity, liveChannels, NOW, PLATFORM_CODE, PLATFORMS, WEEK_DAYS, weekPosts, type CalendarPost } from '../lib/mock'
+import { dayCapacity, liveChannels, NOW, PLATFORM_CODE, PLATFORMS, providerAt, WEEK_DAYS, weekPosts, type CalendarPost } from '../lib/mock'
 
 /** 8 warna lembut ramah-kertas, satu per channel. Teks di atasnya selalu tinta gelap. */
 const TINTS = ['#EBD9C6', '#D5E0D3', '#EFE3B8', '#D3DCE8', '#E6D2D0', '#DCE5C8', '#EBCFD2', '#D9D3E4']
@@ -204,7 +204,7 @@ export default function Kalender() {
                     <td>{p.channel.name}</td>
                     <td className="mono">{p.platforms.map((i) => PLATFORM_CODE[i]).join(' ')}</td>
                     <td className={p.conflict ? 'text-red' : 'text-blue'}>{p.conflict ? 'Bentrok' : 'Terjadwal'}</td>
-                    <td>{[...new Set(p.platforms.map((i) => p.channel.providers[i]))].join(' + ')}</td>
+                    <td>{[...new Set(p.platforms.map((i) => providerAt(p.channel, i)))].join(' + ')}</td>
                   </tr>
                 ))}
             </tbody>

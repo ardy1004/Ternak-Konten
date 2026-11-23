@@ -5,7 +5,21 @@ import { PostMark, Poster, StageGlyph, TickBar } from '../components/domain'
 import { Icon, type IconName } from '../components/Icon'
 import { Label, Seg, Switch } from '../components/ui'
 import { duration, num, times } from '../lib/format'
-import { findChannel, slotPlan, stockDays, targetRatio, verdictHead, videoCount, videosFor, type VideoKind } from '../lib/mock'
+import {
+  findChannel,
+  monetizationProgress,
+  PLATFORMS,
+  revenueOf,
+  roi,
+  schedulerReady,
+  slotPlan,
+  stockDays,
+  targetRatio,
+  verdictHead,
+  videoCount,
+  videosFor,
+  type VideoKind,
+} from '../lib/mock'
 import type { Channel, Ratio, Video } from '../lib/types'
 
 const TABS: { kind: VideoKind; label: string }[] = [
@@ -43,7 +57,7 @@ export default function Workspace() {
 }
 
 function ChannelWorkspace({ c }: { c: Channel }) {
-  const { toast, openModal, openUpload } = useApp()
+  const { toast, openModal, openUpload, openWizard } = useApp()
   const [tab, setTab] = useState<VideoKind>('antre')
   const [queue, setQueue] = useState<Video[]>(() => videosFor(c, 'antre'))
   const [selected, setSelected] = useState<string[]>([])
@@ -74,6 +88,8 @@ function ChannelWorkspace({ c }: { c: Channel }) {
   const gone = c.stage === 'Dipangkas'
   const r = targetRatio(c)
   const days = stockDays(c)
+  const money = roi(c)
+  const income = revenueOf(c.id).total
   const slots = slotPlan(c)
   const width = CARD_WIDTH[size]
   const isQueue = tab === 'antre'
@@ -150,7 +166,7 @@ function ChannelWorkspace({ c }: { c: Channel }) {
               <Icon n="upload" s={14} />
               Unggah Video
             </button>
-            <button type="button" className="btn btn-outline" onClick={() => toast('Pengaturan channel menyusul bersama backend')}>
+            <button type="button" className="btn btn-outline" onClick={() => openWizard(c.id)}>
               Pengaturan channel
             </button>
           </div>
@@ -159,19 +175,30 @@ function ChannelWorkspace({ c }: { c: Channel }) {
 
       <section className="mb-6">
         <Label>Rapor eksperimen</Label>
-        <div className="grid grid-cols-2 border-y-[1.5px] border-ink md:grid-cols-4">
-          {[
-            [`Hari ${c.day}/${c.dayTotal}`, <TickBar key="t" v={c.day} max={c.dayTotal} n={20} />],
-            [`${c.vids}/${c.vidsTotal} video`, 'sudah tayang'],
-            [`${num(c.viewsPerPost)} views/post`, `target ${num(c.target)}`],
-            [`Stok ${queue.length} video`, days === 0 ? 'habis' : `${days} hari`],
-          ].map(([a, b], i) => (
+        <div className="grid grid-cols-2 border-t-[1.5px] border-ink md:grid-cols-5 md:border-b-[1.5px]">
+          {(
+            [
+              [`Hari ${c.day}/${c.dayTotal}`, <TickBar key="t" v={c.day} max={c.dayTotal} n={20} />, false],
+              [`${c.vids}/${c.vidsTotal} video`, 'sudah tayang', false],
+              [num(c.viewsPerPost), `views/post · target ${num(c.target)}`, false],
+              [
+                `Rp ${num(income)}`,
+                money === null ? 'pendapatan bulan ini' : `pendapatan · ROI ${times(money)}`,
+                money !== null && money >= 1,
+              ],
+              [`Stok ${queue.length} video`, days === 0 ? 'habis' : `${days} hari`, false],
+            ] as const
+          ).map(([a, b, good], i) => (
             <div
               key={i}
-              className={`px-4 py-5 ${i % 2 ? 'border-l border-line' : ''} ${i === 2 ? 'md:border-l' : ''} ${i >= 2 ? 'border-t border-line md:border-t-0' : ''}`}
+              className={`border-b-[1.5px] border-ink px-4 py-5 md:border-b-0 ${i % 2 ? 'border-l border-l-line' : ''} ${i > 0 ? 'md:border-l md:border-l-line' : ''}`}
             >
-              <div className="mono text-[20px] font-semibold md:text-[26px]">{a}</div>
-              <div className={`mono mt-1 text-[12px] ${i === 3 && days <= 2 ? 'text-red' : 'text-muted'}`}>{b}</div>
+              <div className="mono text-[20px] font-semibold md:text-[24px]">{a}</div>
+              <div
+                className={`mono mt-1 text-[12px] ${i === 4 && days <= 2 ? 'text-red' : good ? 'font-semibold text-tomatotxt' : 'text-muted'}`}
+              >
+                {b}
+              </div>
             </div>
           ))}
         </div>
@@ -184,14 +211,16 @@ function ChannelWorkspace({ c }: { c: Channel }) {
         </p>
       </section>
 
+      {!gone && <MonetizationPath c={c} />}
+
       {!gone && (
         <section className="mb-8">
           <Label>
             Slot hari ini {slots.filter((s) => s.used).length}/{slots.length} · Otomatis bertahap · hari ke-{c.day}
           </Label>
-          {slots.length === 0 || !c.schedulerReady ? (
+          {slots.length === 0 || !schedulerReady(c) ? (
             <p className="text-[13px] text-red">
-              {c.schedulerReady ? 'Tidak ada slot aktif.' : 'Scheduler kosong — tidak ada slot yang bisa diisi.'}
+              {schedulerReady(c) ? 'Tidak ada slot aktif.' : 'Scheduler tidak bisa dipakai — periksa koneksinya di halaman Koneksi.'}
             </p>
           ) : (
             <>
@@ -549,5 +578,72 @@ function BulkButton({ children, onClick, type = 'button' }: { children: string; 
     <button type={type} className="rounded-[4px] border-[1.5px] border-paper px-3 py-1 text-[13px]" onClick={onClick}>
       {children}
     </button>
+  )
+}
+
+/** Kemajuan menuju syarat monetisasi tiap platform yang dipakai channel ini. */
+function MonetizationPath({ c }: { c: Channel }) {
+  const programs = monetizationProgress(c)
+  if (programs.length === 0) return null
+  return (
+    <section className="mb-8">
+      <Label
+        right={
+          <Link to="/pengaturan" className="text-[12px] underline">
+            Atur syarat
+          </Link>
+        }
+      >
+        Jalan ke monetisasi
+      </Label>
+      <div className="grid gap-4 md:grid-cols-3">
+        {programs.map((p) => (
+          <div key={p.rule.program} className="box space-y-3 p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="font-semibold">{p.rule.program}</h3>
+              <span className="mono text-[11px] text-muted">{PLATFORMS[p.rule.platform]}</span>
+            </div>
+            {p.all.map((q) => (
+              <Requirement key={q.label} q={q} />
+            ))}
+            {p.anyOf.length > 0 && (
+              <div className="space-y-3 border-t border-dashed border-line pt-3">
+                <span className="mono block text-[10px] uppercase tracking-wider text-muted">Salah satu</span>
+                {p.anyOf.map((q) => (
+                  <Requirement key={q.label} q={q} />
+                ))}
+              </div>
+            )}
+            <p className={`text-[12px] ${p.eligible ? 'font-semibold text-tomatotxt' : 'text-muted'}`}>
+              {p.eligible
+                ? 'Syarat terpenuhi — ajukan monetisasi.'
+                : p.daysToFollowers
+                  ? `Syarat follower ± ${num(p.daysToFollowers)} hari lagi pada laju sekarang.`
+                  : 'Belum memenuhi syarat.'}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function Requirement({ q }: { q: { label: string; current: number; target: number; done: boolean } }) {
+  const pct = Math.min(1, q.current / q.target)
+  return (
+    <div>
+      <div className="mb-1 flex justify-between gap-2 text-[12px]">
+        <span>{q.label}</span>
+        <span className={`mono ${q.done ? 'font-semibold text-green' : ''}`}>
+          {num(q.current)} / {num(q.target)}
+        </span>
+      </div>
+      <div className="h-2 bg-line" aria-hidden="true">
+        <div
+          className="h-full"
+          style={{ width: `${Math.max(pct * 100, pct > 0 ? 1 : 0)}%`, background: q.done ? 'var(--green)' : 'var(--ink)' }}
+        />
+      </div>
+    </div>
   )
 }

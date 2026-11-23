@@ -13,6 +13,7 @@ import {
   medianCurve,
   NOW,
   PLATFORMS,
+  roi,
   topVideos,
 } from '../lib/mock'
 import type { Stage } from '../lib/types'
@@ -145,6 +146,7 @@ export default function Bandingkan() {
                 </th>
               ))}
               <th className="th">Biaya/1.000 views</th>
+              <th className="th">ROI bulan ini</th>
             </tr>
           </thead>
           <tbody>
@@ -177,6 +179,9 @@ export default function Bandingkan() {
                     )
                   })}
                   <td className="mono">{cost === null ? '—' : `Rp ${num(cost)}`}</td>
+                  <td className={`mono ${(roi(c) ?? 0) >= 1 ? 'font-semibold text-tomatotxt' : ''}`}>
+                    {roi(c) === null ? '—' : times(roi(c)!)}
+                  </td>
                 </tr>
               )
             })}

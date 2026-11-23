@@ -29,7 +29,11 @@ video). Saat itu muncul keputusan: **Lanjutkan / Ubah format / Pangkas**.
 
 ## Metrik utama
 
-- **Views per post (median)** dan **followers per hari** — ukuran menang.
+- **ROI = pendapatan ÷ biaya** — ukuran menang yang sesungguhnya. Pendapatan dari
+  afiliasi (Shopee Affiliate, TikTok Shop) dan monetisasi platform.
+- **Jalan ke monetisasi** — kemajuan tiap channel menuju syarat program monetisasi
+  platform (syaratnya bisa diatur).
+- **Views per post (median)** dan **followers per hari** — sinyal awal sebelum uang datang.
 - **Stok antrean (hari)** — berapa lama channel bisa terus posting.
 - **Biaya per niche** — Buffer menagih per channel, 10 niche × 5 platform = 50 channel.
 - Perbandingan antar niche selalu **pada umur akun yang sama**.
@@ -44,11 +48,17 @@ video). Saat itu muncul keputusan: **Lanjutkan / Ubah format / Pangkas**.
 | `/unggah` | Unggah Massal | Unggah sekali, bagi ke banyak channel; peringatan otomatis (dipakai ulang, durasi, rasio, panjang caption) |
 | `/kalender` | Kalender | Minggu / Hari / Daftar; penanda bentrok akun; kapasitas slot per hari |
 | `/bandingkan` | Bandingkan Niche | Kurva kohort per hari ke-N, titik periksa H+7/14/30/60, biaya per 1.000 views, pola, video teratas |
-| `/pengaturan` | Pengaturan | Mode akun, masa uji bawaan, biaya alat, jendela primetime, otomasi, storage global, notifikasi, log |
+| `/pendapatan` | Pendapatan | Pendapatan bulan ini & ROI per channel, link afiliasi + halaman link-in-bio, catat pendapatan manual (Rp/USD), impor komisi CSV, program monetisasi yang paling dekat |
+| `/koneksi` | Koneksi | Bank kredensial: akun Buffer, Zernio, Cloudinary; status tes, akun media sosial tertaut, pemakaian kuota, peringatan akun dipakai dua channel |
+| `/pengaturan` | Pengaturan | Mode akun, masa uji bawaan, biaya & kurs, syarat monetisasi, jendela primetime, otomasi, storage global, notifikasi, log |
+| `/l/:channel` | Link-in-bio (publik) | Daftar produk afiliasi satu channel untuk penonton; setiap klik lewat `/r/:kode` |
 
 ## Integrasi
 
-- **Cloudinary** — tempat file video & poster. Per channel atau akun global.
-- **Buffer / Zernio** — pengirim post ke platform. Provider dipilih per platform
-  per channel (mis. YouTube lewat Buffer, Instagram lewat Zernio).
+Semua kredensial didaftarkan sekali di **Koneksi**; channel hanya memilih.
+
+- **Cloudinary** — tempat file video & poster. Bisa beberapa akun untuk membagi kuota.
+- **Buffer / Zernio** — pengirim post ke platform. Bisa beberapa akun; provider dipilih
+  per platform per channel (mis. YouTube lewat Buffer, Instagram lewat Zernio).
+- **Program afiliasi** — komisi diimpor dari laporan CSV, dicocokkan lewat Sub ID.
 - Metrik ditarik dari Buffer & Zernio, bukan dari API platform langsung.

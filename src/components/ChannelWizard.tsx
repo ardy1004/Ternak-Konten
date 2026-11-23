@@ -1,88 +1,105 @@
 import { Fragment, useState } from 'react'
+import { Link } from 'react-router'
 import { useApp } from '../app/context'
 import { num } from '../lib/format'
-import { PLATFORMS } from '../lib/mock'
-import type { Provider } from '../lib/types'
+import { CONNECTIONS, findChannel, findConnection, GLOBAL_STORAGE_ID, ownerOfProfile, PLATFORMS } from '../lib/mock'
 import { Monogram, PlatGlyph } from './domain'
 import { Icon } from './Icon'
-import { Chips, Field, Label, MultiChips, Seg, Sheet, Switch } from './ui'
+import { Chips, Field, Label, MultiChips, Sheet, Switch } from './ui'
 
 const STEPS = ['Identitas', 'Eksperimen', 'Storage', 'Scheduler', 'Jadwal'] as const
 const NICHES = ['kuliner', 'otomotif', 'keuangan', 'horor', 'travel', 'edukasi', 'properti'] as const
 const FORMATS = ['Faceless', 'Voice-over', 'Talking head', 'Slideshow', 'Lainnya'] as const
-const METRICS = ['Median views/post', 'Followers', 'Engagement'] as const
+export const TARGET_METRICS = ['Median views/post', 'Followers', 'Engagement', 'ROI (pendapatan ÷ biaya)', 'Pendapatan per bulan'] as const
 const DAYS = ['Sen 23', 'Sel 24', 'Rab 25', 'Kam 26', 'Jum 27', 'Sab 28', 'Min 29']
 
-/** Akun tertaut contoh — nantinya diambil dari API Buffer/Zernio. */
-const LINKED = [
-  { platform: 0, name: 'Dapur Nenek', id: 'yt_8821' },
-  { platform: 1, name: '@dapurnenek', id: 'tt_4410' },
-  { platform: 2, name: 'dapur.nenek', id: 'ig_1902' },
-]
+type Niche = (typeof NICHES)[number]
+type Format = (typeof FORMATS)[number]
+type Metric = (typeof TARGET_METRICS)[number]
+interface RouteDraft {
+  on: boolean
+  connectionId: string
+  profileId: string
+}
 
-export function ChannelWizard({ onClose }: { onClose: () => void }) {
+const schedulerConnections = CONNECTIONS.filter((k) => k.provider !== 'Cloudinary')
+const storageConnections = CONNECTIONS.filter((k) => k.provider === 'Cloudinary')
+
+/** Tambah channel (tanpa channelId) atau edit channel yang ada. Kredensial dipilih dari Koneksi, tidak diketik ulang. */
+export function ChannelWizard({ channelId, onClose }: { channelId?: string; onClose: () => void }) {
   const { toast } = useApp()
+  const existing = findChannel(channelId)
+  const editing = Boolean(existing)
   const [step, setStep] = useState(0)
-  const [name, setName] = useState('')
-  const [niche, setNiche] = useState<(typeof NICHES)[number]>('kuliner')
-  const [tags, setTags] = useState<string[]>(['#kuliner', '#resep'])
-  const [format, setFormat] = useState<(typeof FORMATS)[number]>('Faceless')
-  const [days, setDays] = useState(30)
-  const [vids, setVids] = useState(30)
-  const [metric, setMetric] = useState<(typeof METRICS)[number]>('Median views/post')
-  const [target, setTarget] = useState(1000)
-  const [storage, setStorage] = useState<'global' | 'own'>('global')
-  const [storageTest, setStorageTest] = useState<string | null>(null)
-  const [showSecret, setShowSecret] = useState(false)
-  const [linked, setLinked] = useState<Record<Provider, boolean>>({ Buffer: false, Zernio: false })
-  const [route, setRoute] = useState(
-    PLATFORMS.map((_, i) => ({ on: i < 3, provider: (i === 2 || i === 4 ? 'Zernio' : 'Buffer') as Provider, account: '' })),
+  const [name, setName] = useState(existing?.name ?? '')
+  const [niche, setNiche] = useState<Niche>((existing?.niche as Niche) ?? 'kuliner')
+  const [tags, setTags] = useState<string[]>([`#${existing?.niche ?? 'kuliner'}`, '#fyp'])
+  const [format, setFormat] = useState<Format>((existing?.format as Format) ?? 'Faceless')
+  const [days, setDays] = useState(existing?.dayTotal ?? 30)
+  const [vids, setVids] = useState(existing?.vidsTotal ?? 30)
+  const [metric, setMetric] = useState<Metric>('Median views/post')
+  const [target, setTarget] = useState(existing?.target ?? 1000)
+  const [storageId, setStorageId] = useState(existing?.storageId ?? GLOBAL_STORAGE_ID)
+  const [routes, setRoutes] = useState<RouteDraft[]>(() =>
+    PLATFORMS.map((_, p) => {
+      const r = existing?.routes[p]
+      if (r) return { on: true, connectionId: r.connectionId, profileId: r.profileId }
+      return { on: !existing && p < 3, connectionId: schedulerConnections[0].id, profileId: '' }
+    }),
   )
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
   const [slots, setSlots] = useState(['07.00', '12.15', '19.30'])
   const [newSlot, setNewSlot] = useState('21.00')
 
-  const finish = (start: boolean) => {
-    toast(start ? `${name || 'Channel baru'} dibuat, masa uji dimulai` : 'Channel disimpan, belum aktif')
+  const setRoute = (p: number, patch: Partial<RouteDraft>) => setRoutes(routes.map((r, k) => (k === p ? { ...r, ...patch } : r)))
+  const finish = (message: string) => {
+    toast(message)
     onClose()
   }
-  const setRow = (i: number, patch: Partial<(typeof route)[number]>) => setRoute(route.map((r, k) => (k === i ? { ...r, ...patch } : r)))
 
   return (
     <Sheet
-      title="Tambah Channel"
-      width={680}
+      title={editing ? `Pengaturan: ${existing!.name}` : 'Tambah Channel'}
+      width={720}
       onClose={onClose}
       footer={
-        <>
-          <button type="button" className="btn btn-outline" disabled={step === 0} onClick={() => setStep(step - 1)}>
-            Kembali
-          </button>
-          {step < STEPS.length - 1 ? (
-            <button type="button" className="btn btn-primary" onClick={() => setStep(step + 1)}>
-              Lanjut
+        editing ? (
+          <>
+            <button type="button" className="btn btn-outline" onClick={onClose}>
+              Batal
             </button>
-          ) : (
-            <>
-              <button type="button" className="btn btn-tomato" onClick={() => finish(true)}>
-                Simpan & mulai masa uji
+            <button type="button" className="btn btn-primary ml-auto" onClick={() => finish(`Pengaturan ${name} disimpan`)}>
+              Simpan perubahan
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn btn-outline" disabled={step === 0} onClick={() => setStep(step - 1)}>
+              Kembali
+            </button>
+            {step < STEPS.length - 1 ? (
+              <button type="button" className="btn btn-primary" onClick={() => setStep(step + 1)}>
+                Lanjut
               </button>
-              <button type="button" className="btn btn-outline" onClick={() => finish(false)}>
-                Simpan, jangan aktifkan dulu
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            className="ml-auto text-[13px] underline"
-            onClick={() => {
-              toast('Draft disimpan')
-              onClose()
-            }}
-          >
-            Simpan sebagai draft
-          </button>
-        </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-tomato"
+                  onClick={() => finish(`${name || 'Channel baru'} dibuat, masa uji dimulai`)}
+                >
+                  Simpan & mulai masa uji
+                </button>
+                <button type="button" className="btn btn-outline" onClick={() => finish('Channel disimpan, belum aktif')}>
+                  Simpan, jangan aktifkan dulu
+                </button>
+              </>
+            )}
+            <button type="button" className="ml-auto text-[13px] underline" onClick={() => finish('Draft disimpan')}>
+              Simpan sebagai draft
+            </button>
+          </>
+        )
       }
     >
       <ol className="mb-8 flex border-b border-line">
@@ -115,14 +132,18 @@ export function ChannelWizard({ onClose }: { onClose: () => void }) {
           <Field label="Niche">
             <Chips options={NICHES} value={niche} onChange={setNiche} />
           </Field>
-          <Field label="Email akun">
+          <Field label="Email akun" hint="Hanya catatan email pemilik akun. Kata sandi media sosial tidak disimpan di sini.">
             <input type="email" placeholder="akun@gmail.com" />
           </Field>
-          <Field label="Template caption" hint="Variabel: {judul} {hashtag_niche}">
-            <textarea rows={3} defaultValue="{judul} — simpan dulu, coba nanti. {hashtag_niche}" className="mono !text-[12px]" />
+          <Field label="Template caption" hint="Variabel: {judul} {hashtag_niche} {link_bio}">
+            <textarea
+              rows={3}
+              defaultValue="{judul} — simpan dulu, coba nanti. Produk di {link_bio} {hashtag_niche}"
+              className="mono !text-[12px]"
+            />
           </Field>
           <Field label="Hashtag niche">
-            <MultiChips options={['#kuliner', '#resep', '#fyp', '#masakrumahan']} value={tags} onChange={setTags} />
+            <MultiChips options={[`#${niche}`, '#fyp', '#viral', `#${niche}harian`]} value={tags} onChange={setTags} />
           </Field>
         </>
       )}
@@ -130,7 +151,7 @@ export function ChannelWizard({ onClose }: { onClose: () => void }) {
       {step === 1 && (
         <>
           <Field label="Hipotesis" hint="Satu kalimat: apa yang sedang diuji.">
-            <input placeholder="Resep 30 detik tanpa bicara, close-up tangan" />
+            <input defaultValue={existing?.hypothesis} placeholder="Resep 30 detik tanpa bicara, close-up tangan" />
           </Field>
           <Field label="Format">
             <Chips options={FORMATS} value={format} onChange={setFormat} />
@@ -146,160 +167,150 @@ export function ChannelWizard({ onClose }: { onClose: () => void }) {
           <p className="-mt-2 mb-4 text-[12px] text-muted">Masa uji selesai bila KEDUA batas tercapai.</p>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Metrik">
-              <select value={metric} onChange={(e) => setMetric(e.target.value as typeof metric)}>
-                {METRICS.map((m) => (
+              <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)}>
+                {TARGET_METRICS.map((m) => (
                   <option key={m}>{m}</option>
                 ))}
               </select>
             </Field>
             <Field label="Nilai">
-              <input className="mono" type="number" min={0} value={target} onChange={(e) => setTarget(+e.target.value)} />
+              <input className="mono" type="number" min={0} step="any" value={target} onChange={(e) => setTarget(+e.target.value)} />
             </Field>
           </div>
           <p className="box mb-4 p-3 text-[13px]">
             Lulus bila <b>{metric.toLowerCase()}</b> ≥ <span className="mono">{num(target)}</span> di akhir masa uji.
           </p>
-          <Field label="Biaya per bulan (Rp, opsional)" hint="Terisi otomatis dari harga alat di Pengaturan.">
-            <input className="mono" defaultValue="180.000" />
+          <Field label="Biaya per bulan (Rp)" hint="Dipakai untuk ROI. Terisi otomatis dari harga alat di Pengaturan, boleh diubah.">
+            <input className="mono" defaultValue={num(existing?.costPerMonth ?? 150000)} />
           </Field>
         </>
       )}
 
       {step === 2 && (
         <>
-          <fieldset className="mb-5 space-y-2">
-            <legend className="sr-only">Sumber storage</legend>
-            {(
-              [
-                ['global', 'Pakai storage global'],
-                ['own', 'Akun Cloudinary sendiri'],
-              ] as const
-            ).map(([v, l]) => (
-              <label key={v} className="flex items-center gap-2">
-                <input type="radio" name="storage" checked={storage === v} onChange={() => setStorage(v)} />
-                {l}
-              </label>
-            ))}
+          <Label
+            right={
+              <Link to="/koneksi" onClick={onClose} className="text-[12px] underline">
+                Kelola koneksi →
+              </Link>
+            }
+          >
+            Simpan video di
+          </Label>
+          <fieldset className="space-y-2">
+            <legend className="sr-only">Koneksi Cloudinary</legend>
+            {storageConnections.map((k) => {
+              const pct = k.usage ? k.usage.used / k.usage.limit : 0
+              return (
+                <label
+                  key={k.id}
+                  className={`box flex cursor-pointer items-center gap-3 p-3 ${storageId === k.id ? '!border-[2.5px] !border-tomato' : ''}`}
+                >
+                  <input type="radio" name="storage" checked={storageId === k.id} onChange={() => setStorageId(k.id)} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">
+                      {k.label} {k.id === GLOBAL_STORAGE_ID && <span className="chip ml-1 !py-0 !text-[10px]">Global</span>}
+                    </span>
+                    <span className="mono block text-[11px] text-muted">{k.cloudName}</span>
+                  </span>
+                  <span className={`mono text-[12px] ${pct >= 0.8 ? 'font-semibold text-red' : 'text-muted'}`}>
+                    {Math.round(pct * 100)}% kuota
+                  </span>
+                </label>
+              )
+            })}
           </fieldset>
-          {storage === 'own' && (
-            <>
-              <Field label="Cloud name">
-                <input className="mono" placeholder="ternak-dapur" />
-              </Field>
-              <Field label="API key">
-                <input className="mono" placeholder="123456789012345" />
-              </Field>
-              <Field label="API secret" hint="Saat mengedit channel: kosongkan = tetap pakai nilai lama.">
-                <div className="relative">
-                  <input className="mono !pr-9" type={showSecret ? 'text' : 'password'} placeholder="••••••••" />
-                  <button
-                    type="button"
-                    className="absolute right-2 top-2"
-                    onClick={() => setShowSecret(!showSecret)}
-                    aria-label={showSecret ? 'Sembunyikan' : 'Tampilkan'}
-                  >
-                    <Icon n="eye" />
-                  </button>
-                </div>
-              </Field>
-              <Field label="Folder">
-                <input className="mono" defaultValue="ternak/dapur-nenek" />
-              </Field>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setStorageTest('Terhubung · 4,2 GB · 12,4/25 kredit bulan ini')}
-              >
-                Tes koneksi
-              </button>
-              {storageTest && <p className="mono mt-3 text-[12px] text-green">{storageTest}</p>}
-            </>
-          )}
+          <p className="mt-3 text-[12px] text-muted">Belum ada akun Cloudinary yang cocok? Tambahkan dulu di halaman Koneksi.</p>
         </>
       )}
 
       {step === 3 && (
         <>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2">
-            {(['Buffer', 'Zernio'] as const).map((p) => (
-              <div key={p} className="box p-4">
-                <h4 className="mb-3 font-semibold">{p}</h4>
-                <Field label="API key">
-                  <input type="password" className="mono" placeholder="••••••••" />
-                </Field>
-                <button type="button" className="btn btn-outline" onClick={() => setLinked({ ...linked, [p]: true })}>
-                  Tes & ambil akun tertaut
-                </button>
-                {linked[p] && (
-                  <ul className="mt-3 space-y-1 text-[12px]">
-                    {LINKED.map((a) => (
-                      <li key={a.id} className="flex items-center gap-2">
-                        <PlatGlyph i={a.platform} />
-                        {a.name}
-                        <span className="mono ml-auto text-muted">{a.id}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-          <Label>Rute platform</Label>
+          <Label
+            right={
+              <Link to="/koneksi" onClick={onClose} className="text-[12px] underline">
+                Kelola koneksi →
+              </Link>
+            }
+          >
+            Rute platform
+          </Label>
           <div className="scroll-x">
-            <table className="w-full min-w-[560px] text-[13px]">
+            <table className="w-full min-w-[600px] text-[13px]">
               <thead>
                 <tr>
                   <th className="th py-1">Aktif</th>
                   <th className="th">Platform</th>
-                  <th className="th">Provider</th>
-                  <th className="th">Akun tujuan</th>
+                  <th className="th">Koneksi</th>
+                  <th className="th">Akun</th>
                   <th className="th">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {PLATFORMS.map((p, i) => {
-                  const r = route[i]
-                  const connected = linked[r.provider]
-                  const status = !r.on ? null : !connected ? 'Provider belum tersambung' : r.account ? 'Siap' : 'Belum dipilih'
+                  const r = routes[i]
+                  const conn = findConnection(r.connectionId)
+                  const options = conn?.profiles.filter((x) => x.platform === i) ?? []
+                  const chosen = options.find((x) => x.id === r.profileId)
+                  const owner = chosen && ownerOfProfile(i, chosen.handle, existing?.id)
+                  const status = !r.on ? null : conn?.status === 'error' ? 'Koneksi bermasalah' : chosen ? 'Siap' : 'Belum dipilih'
                   return (
                     <Fragment key={p}>
                       <tr className="border-t border-line">
                         <td className="py-2">
-                          <Switch on={r.on} onChange={(on) => setRow(i, { on })} label={`Aktifkan ${p}`} />
+                          <Switch on={r.on} onChange={(on) => setRoute(i, { on })} label={`Aktifkan ${p}`} />
                         </td>
-                        <td>{p}</td>
                         <td>
-                          <Seg
-                            options={['Buffer', 'Zernio'] as const}
-                            value={r.provider}
-                            onChange={(provider) => setRow(i, { provider, account: '' })}
-                            label={`Provider ${p}`}
-                          />
+                          <span className="flex items-center gap-1.5">
+                            <PlatGlyph i={i} state={r.on ? 'ok' : 'off'} />
+                            {p}
+                          </span>
                         </td>
                         <td>
                           <select
                             className="!py-1"
-                            disabled={!r.on || !connected}
-                            value={r.account}
-                            onChange={(e) => setRow(i, { account: e.target.value })}
-                            aria-label={`Akun tujuan ${p}`}
+                            disabled={!r.on}
+                            value={r.connectionId}
+                            onChange={(e) => setRoute(i, { connectionId: e.target.value, profileId: '' })}
+                            aria-label={`Koneksi ${p}`}
                           >
-                            <option value="">Pilih akun…</option>
-                            {LINKED.filter((a) => a.platform === i).map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name} ({a.id})
+                            {schedulerConnections.map((k) => (
+                              <option key={k.id} value={k.id}>
+                                {k.provider} · {k.label}
+                                {k.status === 'error' ? ' (bermasalah)' : ''}
                               </option>
                             ))}
                           </select>
                         </td>
-                        <td className={`text-[12px] ${status === 'Siap' ? 'text-green' : status ? 'text-muted' : ''}`}>{status ?? '—'}</td>
+                        <td>
+                          <select
+                            className="!py-1"
+                            disabled={!r.on}
+                            value={r.profileId}
+                            onChange={(e) => setRoute(i, { profileId: e.target.value })}
+                            aria-label={`Akun ${p}`}
+                          >
+                            <option value="">{options.length ? 'Pilih akun…' : 'Tidak ada akun tertaut'}</option>
+                            {options.map((x) => (
+                              <option key={x.id} value={x.id}>
+                                {x.handle}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td
+                          className={`whitespace-nowrap text-[12px] ${status === 'Siap' ? 'text-green' : status === 'Koneksi bermasalah' ? 'text-red' : 'text-muted'}`}
+                        >
+                          {status ?? '—'}
+                        </td>
                       </tr>
-                      {r.account === 'ig_1902' && (
+                      {r.on && owner && (
                         <tr>
                           <td colSpan={5} className="pb-2 text-[12px] text-amber">
                             <span className="flex items-center gap-1">
                               <Icon n="alert" s={12} />
-                              Akun ini juga dipakai channel &apos;Dapur Nenek&apos;. Dua channel akan posting ke akun yang sama.
+                              Akun {chosen!.handle} juga dipakai channel &apos;{owner.name}&apos;. Dua channel akan posting ke akun yang
+                              sama.
                             </span>
                           </td>
                         </tr>
@@ -310,6 +321,10 @@ export function ChannelWizard({ onClose }: { onClose: () => void }) {
               </tbody>
             </table>
           </div>
+          <p className="mt-4 text-[12px] text-muted">
+            Akun yang dicari tidak ada? Sambungkan akunnya di dashboard Buffer/Zernio, lalu tekan &ldquo;Tes ulang&rdquo; pada koneksinya di
+            halaman Koneksi.
+          </p>
         </>
       )}
 

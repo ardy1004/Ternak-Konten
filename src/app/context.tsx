@@ -10,6 +10,7 @@ export type ModalState =
   | { type: 'move'; channelId: string; count: number; sentCount: number }
   | { type: 'delete'; count: number }
   | { type: 'auto-off' }
+  | { type: 'revenue'; channelId?: string }
 
 export interface ToastAction {
   label: string
@@ -25,7 +26,8 @@ export interface AppApi {
   /** Menyalakan langsung; mematikan selalu lewat konfirmasi. */
   requestAuto: (on: boolean) => void
   setAuto: (on: boolean) => void
-  openWizard: () => void
+  /** Tanpa argumen = tambah channel baru; dengan id = edit channel itu. */
+  openWizard: (channelId?: string) => void
   openUpload: (channelId: string) => void
 }
 

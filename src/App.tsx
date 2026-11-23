@@ -8,8 +8,12 @@ import { UploadSheet } from './components/UploadSheet'
 import Bandingkan from './pages/Bandingkan'
 import Channel from './pages/Channel'
 import Kalender from './pages/Kalender'
+import Koneksi from './pages/Koneksi'
+import Lainnya from './pages/Lainnya'
+import { AffiliateRedirect, LinkInBio } from './pages/LinkInBio'
 import Login from './pages/Login'
 import Massal from './pages/Massal'
+import Pendapatan from './pages/Pendapatan'
 import Pengaturan from './pages/Pengaturan'
 import Ringkasan from './pages/Ringkasan'
 import Workspace from './pages/Workspace'
@@ -39,7 +43,7 @@ export default function App() {
   const [auto, setAuto] = useState(true)
   const [toasts, setToasts] = useState<{ id: number; message: string; action?: ToastAction }[]>([])
   const [modal, setModal] = useState<ModalState | null>(null)
-  const [wizard, setWizard] = useState(false)
+  const [wizard, setWizard] = useState<{ channelId?: string } | null>(null)
   const [upload, setUpload] = useState<string | null>(null)
   const toastId = useRef(0)
   const location = useLocation()
@@ -67,7 +71,7 @@ export default function App() {
       auto,
       setAuto,
       requestAuto: (on) => (on ? setAuto(true) : setModal({ type: 'auto-off' })),
-      openWizard: () => setWizard(true),
+      openWizard: (channelId) => setWizard({ channelId }),
       openUpload: setUpload,
     }),
     [toast, dark, auto],
@@ -82,6 +86,17 @@ export default function App() {
   }
   const returnTo = (location.state as { from?: string } | null)?.from
   const afterSignIn = returnTo && returnTo !== '/masuk' ? returnTo : '/'
+
+  // Halaman publik (link-in-bio & pengalih link afiliasi) terbuka tanpa masuk
+  // dan tanpa sidebar — yang membukanya adalah penonton, bukan operator.
+  if (/^\/(l|r)\//.test(location.pathname)) {
+    return (
+      <Routes>
+        <Route path="/l/:id" element={<LinkInBio />} />
+        <Route path="/r/:code" element={<AffiliateRedirect />} />
+      </Routes>
+    )
+  }
 
   if (!signedIn) {
     return (
@@ -104,12 +119,15 @@ export default function App() {
           <Route path="/unggah" element={<Massal />} />
           <Route path="/kalender" element={<Kalender />} />
           <Route path="/bandingkan" element={<Bandingkan />} />
+          <Route path="/pendapatan" element={<Pendapatan />} />
+          <Route path="/koneksi" element={<Koneksi />} />
           <Route path="/pengaturan" element={<Pengaturan />} />
+          <Route path="/lainnya" element={<Lainnya />} />
           <Route path="/masuk" element={<Navigate to={afterSignIn} replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Shell>
-      {wizard && <ChannelWizard onClose={() => setWizard(false)} />}
+      {wizard && <ChannelWizard key={wizard.channelId ?? 'baru'} channelId={wizard.channelId} onClose={() => setWizard(null)} />}
       {upload && <UploadSheet channelId={upload} onClose={() => setUpload(null)} />}
       {modal && <Modals m={modal} close={() => setModal(null)} />}
     </AppContext.Provider>

@@ -1,14 +1,17 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useApp } from '../app/context'
 import { Field, Label, Seg, Switch } from '../components/ui'
 import { num } from '../lib/format'
-import { CHANNELS } from '../lib/mock'
+import { CHANNELS, CONNECTIONS, GLOBAL_STORAGE_ID, MONETIZATION_RULES, PLATFORMS, providerAt, USD_RATE_DEFAULT } from '../lib/mock'
+import { TARGET_METRICS } from '../components/ChannelWizard'
 
 const TABS = [
   'Umum',
   'Mode akun',
   'Masa uji default',
-  'Biaya alat',
+  'Biaya & kurs',
+  'Syarat monetisasi',
   'Jendela primetime',
   'Otomasi',
   'Storage global',
@@ -34,7 +37,11 @@ export default function Pengaturan() {
   const [mode, setMode] = useState<'Terpusat' | 'Per channel'>('Per channel')
   const [notify, setNotify] = useState<Record<string, boolean>>({})
   const [prices, setPrices] = useState({ buffer: 60000, zernio: 45000, cloudinary: 350000 })
-  const connected = CHANNELS.flatMap((c) => c.providers.map((p, i) => (c.accounts[i] !== 'off' ? p : null)))
+  const [rate, setRate] = useState(USD_RATE_DEFAULT)
+  const [rules, setRules] = useState(MONETIZATION_RULES)
+  const [globalStorage, setGlobalStorage] = useState(GLOBAL_STORAGE_ID)
+  // Biaya per akun media sosial yang aktif, dikelompokkan per provider koneksinya.
+  const connected = CHANNELS.flatMap((c) => c.accounts.map((a, i) => (a !== 'off' ? providerAt(c, i) : null)))
   const total =
     connected.filter((p) => p === 'Buffer').length * prices.buffer +
     connected.filter((p) => p === 'Zernio').length * prices.zernio +
@@ -111,9 +118,9 @@ export default function Pengaturan() {
               </Field>
               <Field label="Metrik">
                 <select>
-                  <option>Median views/post</option>
-                  <option>Followers</option>
-                  <option>Engagement</option>
+                  {TARGET_METRICS.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
                 </select>
               </Field>
               <Field label="Nilai target">
@@ -122,7 +129,7 @@ export default function Pengaturan() {
             </div>
           )}
 
-          {tab === 'Biaya alat' && (
+          {tab === 'Biaya & kurs' && (
             <>
               {(
                 [
@@ -142,8 +149,16 @@ export default function Pengaturan() {
               ))}
               <p className="mono text-[22px] font-semibold">Total Rp {num(total)}/bln</p>
               <p className="mt-1 text-[12px] text-muted">
-                Dihitung dari jumlah akun tersambung per provider. Dipakai untuk biaya per niche di Bandingkan.
+                Dihitung dari jumlah akun media sosial aktif per provider. Dipakai untuk biaya & ROI per niche.
               </p>
+              <div className="mt-6 border-t border-line pt-4">
+                <Field
+                  label="Kurs USD → Rp"
+                  hint="Untuk mencatat pendapatan YouTube/AdSense yang dibayar dalam USD. Isi sesuai kurs yang kamu pakai."
+                >
+                  <input className="mono !w-40" type="number" value={rate} onChange={(e) => setRate(+e.target.value)} />
+                </Field>
+              </div>
             </>
           )}
 
@@ -193,13 +208,65 @@ export default function Pengaturan() {
 
           {tab === 'Storage global' && (
             <>
-              <Field label="Cloud name">
-                <input className="mono" defaultValue="ternak-global" />
+              <p className="mb-4 text-ink2">Channel yang tidak memilih akun Cloudinary sendiri menyimpan videonya di sini.</p>
+              <Field label="Koneksi Cloudinary global">
+                <select value={globalStorage} onChange={(e) => setGlobalStorage(e.target.value)}>
+                  {CONNECTIONS.filter((k) => k.provider === 'Cloudinary').map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.label} ({k.cloudName})
+                    </option>
+                  ))}
+                </select>
               </Field>
-              <div className="h-3 bg-line" aria-hidden="true">
-                <div className="h-full w-1/2 bg-ink" />
-              </div>
-              <p className="mono mt-1 text-[12px]">12,4/25 kredit bulan ini</p>
+              <Link to="/koneksi" className="text-[13px] underline">
+                Kelola akun Cloudinary di halaman Koneksi →
+              </Link>
+            </>
+          )}
+
+          {tab === 'Syarat monetisasi' && (
+            <>
+              <p className="mb-5 rounded-[4px] border-[1.5px] border-amber p-3 text-[13px] text-amber">
+                Syarat resmi tiap program berubah dari waktu ke waktu dan bisa berbeda per negara. Angka bawaan ini hanya titik awal —
+                periksa halaman resmi platformnya, lalu sesuaikan di sini.
+              </p>
+              {rules.map((rule, ri) => (
+                <div key={rule.program} className="mb-6">
+                  <h3 className="mb-2 font-semibold">
+                    {rule.program} <span className="mono text-[11px] font-normal text-muted">{PLATFORMS[rule.platform]}</span>
+                  </h3>
+                  {(['all', 'anyOf'] as const).map((group) =>
+                    rule[group].length === 0 ? null : (
+                      <div key={group} className="mb-2">
+                        <span className="mono mb-1 block text-[10px] uppercase tracking-wider text-muted">
+                          {group === 'all' ? 'Wajib semua' : 'Cukup salah satu'}
+                        </span>
+                        {rule[group].map((q, qi) => (
+                          <div key={q.label} className="mb-2 grid grid-cols-[1fr_140px] items-center gap-3">
+                            <span className="text-[13px]">{q.label}</span>
+                            <input
+                              className="mono"
+                              type="number"
+                              min={0}
+                              aria-label={`${rule.program}: ${q.label}`}
+                              value={q.target}
+                              onChange={(e) =>
+                                setRules(
+                                  rules.map((r, k) =>
+                                    k !== ri
+                                      ? r
+                                      : { ...r, [group]: r[group].map((x, j) => (j === qi ? { ...x, target: +e.target.value } : x)) },
+                                  ),
+                                )
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  )}
+                </div>
+              ))}
             </>
           )}
 
