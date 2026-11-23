@@ -1,0 +1,202 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+/*
+ * Papan Ladang — token warna.
+ * Setiap warna status dipakai sebagai TEKS kecil, jadi wajib lolos kontras 4,5:1
+ * di atas --paper dan --surface (terang) maupun versi gelapnya. Amber, hijau, dan
+ * semua warna status mode malam sengaja digeser dari nilai awal karena gagal uji itu.
+ */
+:root {
+  --paper: #f3efe6;
+  --surface: #fbf9f4;
+  --ink: #141210;
+  --ink2: #4a453e;
+  --muted: #6b655d;
+  --line: #d8d1c3;
+  --sand: #d9cfb8;
+  --tomato: #ff5a1f;
+  --tomatotxt: #c2410c;
+  --olive: #5e7d2e;
+  --blue: #2f5bd3;
+  --green: #2a6f2e;
+  --red: #c62828;
+  --amber: #9a5a00;
+  --gray: #8a847b;
+  color-scheme: light;
+}
+/*
+ * Lebar sidebar sebagai satu variabel: dibaca sidebar, konten, dan bar aksi massal
+ * yang menempel di bawah — supaya ketiganya tidak pernah salah posisi saat sidebar
+ * diciutkan atau di layar tablet.
+ */
+.shell {
+  --sidebar-w: 0px;
+}
+@media (min-width: 768px) {
+  .shell {
+    --sidebar-w: 64px;
+  }
+}
+@media (min-width: 1024px) {
+  .shell:not(.rail) {
+    --sidebar-w: 232px;
+  }
+}
+.shell.rail .wide-only {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .wide-only {
+    display: none;
+  }
+}
+.dark {
+  --paper: #12110f;
+  --surface: #1b1a17;
+  --ink: #ede8dd;
+  --ink2: #c9c3b6;
+  --muted: #9a9487;
+  --line: #34312b;
+  --sand: #4a4435;
+  --tomatotxt: #ff7a45;
+  --olive: #9dbe5e;
+  --blue: #8aa8ff;
+  --green: #6cc070;
+  --red: #f2766b;
+  --amber: #e8a33d;
+  --gray: #8f897f;
+  color-scheme: dark;
+}
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-sand: var(--sand);
+  --color-tomato: var(--tomato);
+  --color-tomatotxt: var(--tomatotxt);
+  --color-olive: var(--olive);
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-amber: var(--amber);
+  --color-gray: var(--gray);
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+}
+@layer base {
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+  }
+  button {
+    cursor: pointer;
+  }
+  input,
+  textarea,
+  select {
+    background: var(--surface);
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    padding: 7px 10px;
+    width: 100%;
+    color: var(--ink);
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: auto;
+    accent-color: var(--tomato);
+  }
+  :focus-visible {
+    outline: 2px solid var(--tomato);
+    outline-offset: 2px;
+  }
+  ::placeholder {
+    color: var(--muted);
+  }
+}
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+    padding: 7px 13px;
+    font-weight: 500;
+    border: 1.5px solid var(--ink);
+    white-space: nowrap;
+    font-size: 13px;
+  }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--ink);
+  }
+  .btn-outline:hover {
+    background: var(--sand);
+  }
+  .btn-tomato {
+    background: var(--tomato);
+    border-color: var(--tomato);
+    color: #141210;
+  }
+  .btn-danger {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .box {
+    border: 1.5px solid var(--ink);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .disp {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+    font-weight: 800;
+    line-height: 1.02;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    padding: 3px 9px;
+    font-size: 12px;
+    background: transparent;
+  }
+  .chip[aria-pressed='true'] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .scroll-x {
+    overflow-x: auto;
+  }
+  .th {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 400;
+    text-align: left;
+  }
+}
