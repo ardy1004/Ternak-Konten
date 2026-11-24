@@ -54,6 +54,9 @@ writeFileSync(
       shouldAddSourcemapSupport: true,
       // Batas paket Hobby (fluid compute) = 300 detik.
       maxDuration: 60,
+      // Satu region, dekat database Neon (Singapura). Tanpa ini fungsi jalan di iad1
+      // (AS) dan setiap query menyeberang Pasifik — terjadi di deploy pertama.
+      regions: ['sin1'],
     },
     null,
     2,
