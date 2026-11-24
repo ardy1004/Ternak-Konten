@@ -35,6 +35,13 @@ if (password.length < 12) {
   console.error('Kata sandi minimal 12 karakter.')
   process.exit(1)
 }
+// Halaman login terbuka untuk siapa saja; kata sandi yang memuat email (atau nama sebelum @)
+// adalah tebakan pertama. Pernah terjadi: kata sandi diisi persis sama dengan emailnya.
+const localPart = email.split('@')[0]
+if (password.toLowerCase().includes(email) || (localPart.length >= 4 && password.toLowerCase().includes(localPart))) {
+  console.error(`Kata sandi tidak boleh memuat email atau "${localPart}" — terlalu mudah ditebak.`)
+  process.exit(1)
+}
 
 const values: [string, string][] = [
   ['OPERATOR_EMAIL', email],
